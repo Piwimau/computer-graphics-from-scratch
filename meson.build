@@ -43,14 +43,14 @@ if cpp.get_id() == 'gcc'
         add_project_arguments('-march=native', '-mtune=native', language: 'cpp')
     endif
     # Required for some new C++23 features like `std::println()`.
-    deps += cpp.find_library('stdc++exp', required: true)
+    deps += cpp.find_library('stdc++exp')
 endif
 
 deps += cpp.find_library('m', required: false)
 
 incs = include_directories('include')
 
-srcs = files('src/canvas.cpp')
+srcs = files('src/canvas.cpp', 'src/ppm.cpp', 'src/raytracer.cpp')
 
 cgfs_lib = library(
     'cgfs',
@@ -66,3 +66,7 @@ cgfs_dep = declare_dependency(include_directories: incs, link_with: cgfs_lib)
 
 pkg = import('pkgconfig')
 pkg.generate(cgfs_lib)
+
+if get_option('examples')
+    subdir('examples')
+endif

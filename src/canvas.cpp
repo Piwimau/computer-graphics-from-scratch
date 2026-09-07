@@ -31,6 +31,10 @@ Canvas::Canvas(isize width, isize height)
       _width(width),
       _height(height) { }
 
+std::span<const Color> Canvas::pixels() const noexcept {
+    return std::span<const Color>(_pixels.get(), _width * _height);
+}
+
 isize Canvas::width() const noexcept {
     return _width;
 }

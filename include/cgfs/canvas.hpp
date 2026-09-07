@@ -2,6 +2,7 @@
 #define CGFS_CANVAS_HPP
 
 #include <memory>
+#include <span>
 #include "cgfs/color.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec.hpp"
@@ -32,6 +33,13 @@ public:
      * @param[in] height The height of the canvas.
      */
     Canvas(isize width, isize height);
+
+    /**
+     * @brief Returns the pixels of this canvas in row-major order.
+     *
+     * @return The pixels of this canvas in row-major order.
+     */
+    std::span<const Color> pixels() const noexcept;
 
     /**
      * @brief Returns the width of this canvas.

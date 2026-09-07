@@ -4,3 +4,9 @@ option(
     value: false,
     description: 'Enable machine-specific optimizations (default: false).',
 )
+option(
+    'examples',
+    type: 'boolean',
+    value: false,
+    description: 'Build example programs (default: false).',
+)
