@@ -19,6 +19,9 @@ struct Color {
 
 };
 
+/** @brief The color black. */
+static constexpr Color BLACK = { 0, 0, 0 };
+
 }
 
 #endif

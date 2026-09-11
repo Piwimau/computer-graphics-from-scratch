@@ -4,9 +4,6 @@
 
 namespace cgfs {
 
-/** @brief The default color for pixels. */
-static constexpr Color BLACK = { .r = 0, .g = 0, .b = 0 };
-
 /**
  * @brief Creates an array of pixels with a specified width and height.
  *

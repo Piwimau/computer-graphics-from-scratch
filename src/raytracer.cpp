@@ -38,7 +38,7 @@ static Color trace_ray(
     f32 tMax
 ) noexcept {
     f32 tClosest = std::numeric_limits<f32>::infinity();
-    Color color = { .r = 0, .g = 0, .b = 0 };
+    Color color = BLACK;
     for (const Sphere& sphere : spheres) {
         Vec3<f32> co = ray.origin - sphere.center;
         f32 a = ray.direction.dot(ray.direction);
