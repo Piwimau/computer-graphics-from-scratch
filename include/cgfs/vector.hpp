@@ -1,6 +1,7 @@
 #ifndef CGFS_VECTOR_HPP
 #define CGFS_VECTOR_HPP
 
+#include <cmath>
 #include <concepts>
 
 namespace cgfs {
@@ -75,6 +76,51 @@ struct Vec2 {
     }
 
     /**
+     * @brief Negates this vector (component-wise).
+     *
+     * @return The negation of this vector.
+     */
+    constexpr Vec2<T> operator-() const noexcept {
+        return { -x, -y };
+    }
+
+    /**
+     * @brief Multiplies this vector by a scalar (component-wise).
+     *
+     * @param[in] rhs The scalar to multiply by.
+     * @return A reference to this vector after the multiplication.
+     */
+    constexpr Vec2<T>& operator*=(T rhs) noexcept {
+        x *= rhs;
+        y *= rhs;
+        return *this;
+    }
+
+    /**
+     * @brief Multiplies a vector by a scalar (component-wise).
+     *
+     * @param[in] lhs The vector to scale.
+     * @param[in] rhs The scalar to multiply by.
+     * @return The result of multiplying the vector by the scalar.
+     */
+    friend constexpr Vec2<T> operator*(Vec2<T> lhs, T rhs) noexcept {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    /**
+     * @brief Multiplies a vector by a scalar (component-wise).
+     *
+     * @param[in] lhs The scalar to multiply by.
+     * @param[in] rhs The vector to scale.
+     * @return The result of multiplying the vector by the scalar.
+     */
+    friend constexpr Vec2<T> operator*(T lhs, Vec2<T> rhs) noexcept {
+        rhs *= lhs;
+        return rhs;
+    }
+
+    /**
      * @brief Computes the dot product of this vector and another vector.
      *
      * @param[in] rhs The other vector.
@@ -82,6 +128,35 @@ struct Vec2 {
      */
     constexpr T dot(const Vec2<T>& rhs) const noexcept {
         return x * rhs.x + y * rhs.y;
+    }
+
+    /**
+     * @brief Computes the euclidean norm (or magnitude) of this vector.
+     *
+     * @return The euclidean norm (or magnitude) of this vector.
+     */
+    constexpr T norm() const noexcept {
+        return std::sqrt(this->dot(*this));
+    }
+
+    /**
+     * @brief Computes the normalized (unit) vector of this vector.
+     *
+     * @return The normalized (unit) vector of this vector.
+     */
+    constexpr Vec2<T> normalize() const noexcept {
+        T n = norm();
+        return { x / n, y / n };
+    }
+
+    /**
+     * @brief Computes the reflection of this vector around a surface normal.
+     *
+     * @param[in] normal The surface normal to reflect around.
+     * @return The reflected vector.
+     */
+    constexpr Vec2<T> reflect(const Vec2<T>& normal) const noexcept {
+        return 2 * normal * normal.dot(*this) - *this;
     }
 
 };
@@ -161,6 +236,52 @@ struct Vec3 {
     }
 
     /**
+     * @brief Negates this vector (component-wise).
+     *
+     * @return The negation of this vector.
+     */
+    constexpr Vec3<T> operator-() const noexcept {
+        return { -x, -y, -z };
+    }
+
+    /**
+     * @brief Multiplies this vector by a scalar (component-wise).
+     *
+     * @param[in] rhs The scalar to multiply by.
+     * @return A reference to this vector after the multiplication.
+     */
+    constexpr Vec3<T>& operator*=(T rhs) noexcept {
+        x *= rhs;
+        y *= rhs;
+        z *= rhs;
+        return *this;
+    }
+
+    /**
+     * @brief Multiplies a vector by a scalar (component-wise).
+     *
+     * @param[in] lhs The vector to scale.
+     * @param[in] rhs The scalar to multiply by.
+     * @return The result of multiplying the vector by the scalar.
+     */
+    friend constexpr Vec3<T> operator*(Vec3<T> lhs, T rhs) noexcept {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    /**
+     * @brief Multiplies a vector by a scalar (component-wise).
+     *
+     * @param[in] lhs The scalar to multiply by.
+     * @param[in] rhs The vector to scale.
+     * @return The result of multiplying the vector by the scalar.
+     */
+    friend constexpr Vec3<T> operator*(T lhs, Vec3<T> rhs) noexcept {
+        rhs *= lhs;
+        return rhs;
+    }
+
+    /**
      * @brief Computes the dot product of this vector and another vector.
      *
      * @param[in] rhs The other vector.
@@ -168,6 +289,35 @@ struct Vec3 {
      */
     constexpr T dot(const Vec3<T>& rhs) const noexcept {
         return x * rhs.x + y * rhs.y + z * rhs.z;
+    }
+
+    /**
+     * @brief Computes the euclidean norm (or magnitude) of this vector.
+     *
+     * @return The euclidean norm (or magnitude) of this vector.
+     */
+    constexpr T norm() const noexcept {
+        return std::sqrt(this->dot(*this));
+    }
+
+    /**
+     * @brief Computes the normalized (unit) vector of this vector.
+     *
+     * @return The normalized (unit) vector of this vector.
+     */
+    constexpr Vec3<T> normalize() const noexcept {
+        T n = norm();
+        return { x / n, y / n, z / n };
+    }
+
+    /**
+     * @brief Computes the reflection of this vector around a surface normal.
+     *
+     * @param[in] normal The surface normal to reflect around.
+     * @return The reflected vector.
+     */
+    constexpr Vec3<T> reflect(const Vec3<T>& normal) const noexcept {
+        return 2 * normal * normal.dot(*this) - *this;
     }
 
 };
