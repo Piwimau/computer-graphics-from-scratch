@@ -5,7 +5,7 @@
 #include <span>
 #include "cgfs/color.hpp"
 #include "cgfs/types.hpp"
-#include "cgfs/vec.hpp"
+#include "cgfs/vector.hpp"
 
 namespace cgfs {
 

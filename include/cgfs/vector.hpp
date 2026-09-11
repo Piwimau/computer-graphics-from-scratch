@@ -1,5 +1,5 @@
-#ifndef CGFS_VEC_HPP
-#define CGFS_VEC_HPP
+#ifndef CGFS_VECTOR_HPP
+#define CGFS_VECTOR_HPP
 
 #include <concepts>
 
