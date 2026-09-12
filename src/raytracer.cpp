@@ -16,10 +16,10 @@ namespace cgfs {
 struct Ray {
 
     /** @brief The point at which this ray originates. */
-    Vec3<f32> origin;
+    Vec3<f64> origin;
 
     /** @brief The direction this ray travels in. */
-    Vec3<f32> direction;
+    Vec3<f64> direction;
 
 };
 
@@ -35,29 +35,29 @@ struct Ray {
  * @return A pair containing the closest intersected sphere and the distance
  * along the ray, or `std::nullopt` if no intersection is found.
  */
-static std::optional<std::pair<Sphere, f32>> closest_intersection(
+static std::optional<std::pair<Sphere, f64>> closest_intersection(
     const Ray& ray,
     std::span<const Sphere> spheres,
-    f32 tMin,
-    f32 tMax
+    f64 tMin,
+    f64 tMax
 ) noexcept {
-    std::optional<std::pair<Sphere, f32>> closest;
+    std::optional<std::pair<Sphere, f64>> closest;
     for (const Sphere& sphere : spheres) {
-        Vec3<f32> co = ray.origin - sphere.center;
-        f32 a = ray.direction.dot(ray.direction);
-        f32 b = 2 * co.dot(ray.direction);
-        f32 c = co.dot(co) - sphere.radius * sphere.radius;
-        f32 discriminant = b * b - 4 * a * c;
-        if (discriminant < 0) {
+        Vec3<f64> co = ray.origin - sphere.center;
+        f64 a = ray.direction.dot(ray.direction);
+        f64 b = 2.0 * co.dot(ray.direction);
+        f64 c = co.dot(co) - sphere.radius * sphere.radius;
+        f64 discriminant = b * b - 4.0 * a * c;
+        if (discriminant < 0.0) {
             continue;
         }
-        f32 t1 = (-b - std::sqrt(discriminant)) / (2 * a);
+        f64 t1 = (-b - std::sqrt(discriminant)) / (2.0 * a);
         if ((t1 >= tMin) && (t1 <= tMax)) {
             if (!closest || (t1 < closest->second)) {
                 closest = std::make_pair(sphere, t1);
             }
         }
-        f32 t2 = (-b + std::sqrt(discriminant)) / (2 * a);
+        f64 t2 = (-b + std::sqrt(discriminant)) / (2.0 * a);
         if ((t2 >= tMin) && (t2 <= tMax)) {
             if (!closest || (t2 < closest->second)) {
                 closest = std::make_pair(sphere, t2);
@@ -79,15 +79,15 @@ static std::optional<std::pair<Sphere, f32>> closest_intersection(
  * @param[in] lights    A collection of lights illuminating the scene.
  * @return The intensity of the light illuminating the specified point.
  */
-static f32 compute_lighting(
-    const Vec3<f32>& point,
-    const Vec3<f32>& normal,
-    const Vec3<f32>& viewDir,
-    std::optional<f32> shininess,
+static f64 compute_lighting(
+    const Vec3<f64>& point,
+    const Vec3<f64>& normal,
+    const Vec3<f64>& viewDir,
+    std::optional<f64> shininess,
     std::span<const Sphere> spheres,
     std::span<const Light> lights
 ) noexcept {
-    f32 intensity = 0.0F;
+    f64 intensity = 0.0;
     for (const Light& light : lights) {
         std::visit(
             [&]<typename T>(const T& l) {
@@ -95,35 +95,34 @@ static f32 compute_lighting(
                     intensity += l.intensity;
                 }
                 else {
-                    Vec3<f32> lightDir;
-                    f32 tMin = 0.001F;
-                    f32 tMax;
+                    Vec3<f64> lightDir;
+                    f64 tMax;
                     if constexpr (std::same_as<T, PointLight>) {
                         lightDir = l.position - point;
-                        tMax = 1.0F;
+                        tMax = 1.0;
                     }
                     else {
                         lightDir = l.direction;
-                        tMax = std::numeric_limits<f32>::infinity();
+                        tMax = std::numeric_limits<f64>::infinity();
                     }
                     Ray shadowRay = { .origin = point, .direction = lightDir };
                     auto shadowIntersection = closest_intersection(
                         shadowRay,
                         spheres,
-                        tMin,
+                        0.001,
                         tMax
                     );
                     if (shadowIntersection) {
                         return;
                     }
                     intensity += l.intensity
-                        * std::max(normal.dot(lightDir), 0.0F)
+                        * std::max(normal.dot(lightDir), 0.0)
                         / (normal.norm() * lightDir.norm());
                     if (shininess) {
-                        Vec3<f32> reflectDir = lightDir.reflect(normal);
+                        Vec3<f64> reflectDir = lightDir.reflect(normal);
                         intensity += l.intensity
                             * std::pow(
-                                std::max(reflectDir.dot(viewDir), 0.0F)
+                                std::max(reflectDir.dot(viewDir), 0.0)
                                     / (reflectDir.norm() * viewDir.norm()),
                                 *shininess
                             );
@@ -156,12 +155,12 @@ static Color trace_ray(
     const Ray& ray,
     std::span<const Sphere> spheres,
     std::span<const Light> lights,
-    f32 tMin,
-    f32 tMax,
+    f64 tMin,
+    f64 tMax,
     isize depth = 3
 ) noexcept {
     assert(depth >= 0);
-    std::optional<std::pair<Sphere, f32>> closest = closest_intersection(
+    std::optional<std::pair<Sphere, f64>> closest = closest_intersection(
         ray,
         spheres,
         tMin,
@@ -171,8 +170,8 @@ static Color trace_ray(
         return BLACK;
     }
     const auto& [closestSphere, tClosest] = *closest;
-    Vec3<f32> point = ray.origin + tClosest * ray.direction;
-    Vec3<f32> normal = (point - closestSphere.center).normalize();
+    Vec3<f64> point = ray.origin + tClosest * ray.direction;
+    Vec3<f64> normal = (point - closestSphere.center).normalize();
     Color localColor = closestSphere.color
         * compute_lighting(
             point,
@@ -193,8 +192,8 @@ static Color trace_ray(
         reflectRay,
         spheres,
         lights,
-        0.001F,
-        std::numeric_limits<f32>::infinity(),
+        0.001,
+        std::numeric_limits<f64>::infinity(),
         depth - 1
     );
     return Color::lerp(localColor, reflectColor, *closestSphere.reflectiveness);
@@ -209,11 +208,11 @@ void raytrace(
 ) noexcept {
     for (isize y = canvas.height() / 2 - 1; y >= -canvas.height() / 2; y--) {
         for (isize x = -canvas.width() / 2; x <= canvas.width() / 2 - 1; x++) {
-            Vec3<f32> pos = {
-                .x = static_cast<f32>(x) * viewport.width
-                    / static_cast<f32>(canvas.width()),
-                .y = static_cast<f32>(y) * viewport.height
-                    / static_cast<f32>(canvas.height()),
+            Vec3<f64> pos = {
+                .x = static_cast<f64>(x) * viewport.width
+                    / static_cast<f64>(canvas.width()),
+                .y = static_cast<f64>(y) * viewport.height
+                    / static_cast<f64>(canvas.height()),
                 .z = viewport.distance
             };
             Ray ray = {
@@ -226,8 +225,8 @@ void raytrace(
                     ray,
                     spheres,
                     lights,
-                    1.0F,
-                    std::numeric_limits<f32>::infinity()
+                    1.0,
+                    std::numeric_limits<f64>::infinity()
                 )
             );
         }

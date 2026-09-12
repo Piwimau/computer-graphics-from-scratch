@@ -9,13 +9,13 @@ namespace cgfs {
 struct Viewport {
 
     /** @brief The width of this viewport. */
-    f32 width;
+    f64 width;
 
     /** @brief The height of this viewport. */
-    f32 height;
+    f64 height;
 
     /** @brief The distance of this viewport to the camera. */
-    f32 distance;
+    f64 distance;
 
 };
 

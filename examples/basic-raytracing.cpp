@@ -14,54 +14,47 @@
 int main() {
     std::vector<cgfs::Sphere> spheres = {
         {
-            .center = { 0.0F, -1.0F, 3.0F },
-            .radius = 1.0F,
+            .center = { 0.0, -1.0, 3.0 },
+            .radius = 1.0,
             .color = { 255, 0, 0 },
-            .shininess = 500.0F,
-            .reflectiveness = 0.2F
+            .shininess = 500.0,
+            .reflectiveness = 0.2
         },
         {
-            .center = { -2.0F, 0.0F, 4.0F },
-            .radius = 1.0F,
+            .center = { -2.0, 0.0, 4.0 },
+            .radius = 1.0,
             .color = { 0, 255, 0 },
-            .shininess = 10.0F,
-            .reflectiveness = 0.4F
+            .shininess = 10.0,
+            .reflectiveness = 0.4
         },
         {
-            .center = { 2.0F, 0.0F, 4.0F },
-            .radius = 1.0F,
+            .center = { 2.0, 0.0, 4.0 },
+            .radius = 1.0,
             .color = { 0, 0, 255 },
-            .shininess = 500.0F,
-            .reflectiveness = 0.3F
+            .shininess = 500.0,
+            .reflectiveness = 0.3
         },
         {
-            .center = { 0.0F, -5001.0F, 0.0F },
-            .radius = 5000.0F,
+            .center = { 0.0, -5001.0, 0.0 },
+            .radius = 5000.0,
             .color = { 255, 255, 0 },
-            .shininess = 1000.0F,
-            .reflectiveness = 0.5F
+            .shininess = 1000.0,
+            .reflectiveness = 0.5
         }
     };
     std::vector<cgfs::Light> lights = {
-        cgfs::AmbientLight { .intensity = 0.2F },
-        cgfs::PointLight {
-            .intensity = 0.6F,
-            .position = { 2.0F, 1.0F, 0.0F }
-        },
+        cgfs::AmbientLight { .intensity = 0.2 },
+        cgfs::PointLight { .intensity = 0.6, .position = { 2.0, 1.0, 0.0 } },
         cgfs::DirectionalLight {
-            .intensity = 0.2F,
-            .direction = { 1.0F, 4.0F, 4.0F }
+            .intensity = 0.2,
+            .direction = { 1.0, 4.0, 4.0 }
         }
     };
     cgfs::Camera camera = {
-        .position = { 0.0F, 0.0F, 0.0F },
-        .orientation = { 0.0F, 0.0F, 1.0F }
+        .position = { 0.0, 0.0, 0.0 },
+        .orientation = { 0.0, 0.0, 1.0 }
     };
-    cgfs::Viewport viewport = {
-        .width = 1.0F,
-        .height = 1.0F,
-        .distance = 1.0F
-    };
+    cgfs::Viewport viewport = { .width = 1.0, .height = 1.0, .distance = 1.0 };
     cgfs::Canvas canvas(1024, 1024);
     cgfs::raytrace(spheres, lights, camera, viewport, canvas);
     cgfs::save_ppm(canvas, "output.ppm");

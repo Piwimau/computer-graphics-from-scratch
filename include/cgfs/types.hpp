@@ -45,10 +45,10 @@ using isize = std::ptrdiff_t;
 /** @brief Represents an unsigned integer for sizes, counts and indices. */
 using usize = std::size_t;
 
-/** @brief Represents a 32-bit floating point number. */
+/** @brief Represents a 32-bit floating-point number. */
 using f32 = float;
 
-/** @brief Represents a 64-bit floating point number. */
+/** @brief Represents a 64-bit floating-point number. */
 using f64 = double;
 
 }

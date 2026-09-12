@@ -10,10 +10,10 @@ namespace cgfs {
 struct Camera {
 
     /** @brief The position of this camera. */
-    Vec3<f32> position;
+    Vec3<f64> position;
 
     /** @brief The direction this camera is facing. */
-    Vec3<f32> orientation;
+    Vec3<f64> orientation;
 
 };
 

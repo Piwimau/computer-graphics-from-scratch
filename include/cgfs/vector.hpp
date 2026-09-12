@@ -156,7 +156,7 @@ struct Vec2 {
      * @return The reflected vector.
      */
     constexpr Vec2<T> reflect(const Vec2<T>& normal) const noexcept {
-        return 2 * normal * normal.dot(*this) - *this;
+        return static_cast<T>(2) * normal * normal.dot(*this) - *this;
     }
 
 };
@@ -317,7 +317,7 @@ struct Vec3 {
      * @return The reflected vector.
      */
     constexpr Vec3<T> reflect(const Vec3<T>& normal) const noexcept {
-        return 2 * normal * normal.dot(*this) - *this;
+        return static_cast<T>(2) * normal * normal.dot(*this) - *this;
     }
 
 };

@@ -11,7 +11,7 @@ namespace cgfs {
 struct AmbientLight {
 
     /** @brief The intensity of this ambient light. */
-    f32 intensity;
+    f64 intensity;
 
 };
 
@@ -19,10 +19,10 @@ struct AmbientLight {
 struct PointLight {
 
     /** @brief The intensity of this point light. */
-    f32 intensity;
+    f64 intensity;
 
     /** @brief The position of this point light. */
-    Vec3<f32> position;
+    Vec3<f64> position;
 
 };
 
@@ -30,10 +30,10 @@ struct PointLight {
 struct DirectionalLight {
 
     /** @brief The intensity of this directional light. */
-    f32 intensity;
+    f64 intensity;
 
     /** @brief The direction of this directional light. */
-    Vec3<f32> direction;
+    Vec3<f64> direction;
 
 };
 

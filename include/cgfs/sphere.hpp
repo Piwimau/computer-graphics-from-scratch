@@ -12,19 +12,19 @@ namespace cgfs {
 struct Sphere {
 
     /** @brief The center of this sphere. */
-    Vec3<f32> center;
+    Vec3<f64> center;
 
     /** @brief The radius of this sphere. */
-    f32 radius;
+    f64 radius;
 
     /** @brief The color of this sphere. */
     Color color;
 
     /** @brief The shininess of this sphere (if any). */
-    std::optional<f32> shininess;
+    std::optional<f64> shininess;
 
     /** @brief The reflectiveness of this sphere (if any). */
-    std::optional<f32> reflectiveness;
+    std::optional<f64> reflectiveness;
 
 };
 

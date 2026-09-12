@@ -85,13 +85,13 @@ struct Color {
     requires (std::integral<T> || std::floating_point<T>)
     constexpr Color& operator*=(T rhs) noexcept {
         r = static_cast<u8>(
-            std::clamp<f32>(r * static_cast<f32>(rhs), 0.0F, 255.0F)
+            std::clamp<f64>(r * static_cast<f64>(rhs), 0.0, 255.0)
         );
         g = static_cast<u8>(
-            std::clamp<f32>(g * static_cast<f32>(rhs), 0.0F, 255.0F)
+            std::clamp<f64>(g * static_cast<f64>(rhs), 0.0, 255.0)
         );
         b = static_cast<u8>(
-            std::clamp<f32>(b * static_cast<f32>(rhs), 0.0F, 255.0F)
+            std::clamp<f64>(b * static_cast<f64>(rhs), 0.0, 255.0)
         );
         return *this;
     }
