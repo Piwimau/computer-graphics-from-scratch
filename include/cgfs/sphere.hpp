@@ -23,6 +23,9 @@ struct Sphere {
     /** @brief The shininess of this sphere (if any). */
     std::optional<f32> shininess;
 
+    /** @brief The reflectiveness of this sphere (if any). */
+    std::optional<f32> reflectiveness;
+
 };
 
 }

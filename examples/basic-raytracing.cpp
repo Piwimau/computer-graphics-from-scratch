@@ -17,25 +17,29 @@ int main() {
             .center = { 0.0F, -1.0F, 3.0F },
             .radius = 1.0F,
             .color = { 255, 0, 0 },
-            .shininess = 500.0F
+            .shininess = 500.0F,
+            .reflectiveness = 0.2F
         },
         {
             .center = { -2.0F, 0.0F, 4.0F },
             .radius = 1.0F,
             .color = { 0, 255, 0 },
-            .shininess = 10.0F
+            .shininess = 10.0F,
+            .reflectiveness = 0.4F
         },
         {
             .center = { 2.0F, 0.0F, 4.0F },
             .radius = 1.0F,
             .color = { 0, 0, 255 },
-            .shininess = 500.0F
+            .shininess = 500.0F,
+            .reflectiveness = 0.3F
         },
         {
             .center = { 0.0F, -5001.0F, 0.0F },
             .radius = 5000.0F,
             .color = { 255, 255, 0 },
-            .shininess = 1000.0F
+            .shininess = 1000.0F,
+            .reflectiveness = 0.5F
         }
     };
     std::vector<cgfs::Light> lights = {
