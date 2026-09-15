@@ -74,19 +74,23 @@ int main() {
                 }
             }
         },
-        .ambientLight = { .color = { 1.0, 1.0, 1.0 }, .intensity = 0.2 },
+        .ambientLight = { .color = { 1.0, 1.0, 1.0 }, .intensity = 0.1 },
         .pointLights = {
             {
                 .color = { 1.0, 1.0, 1.0 },
                 .intensity = 0.6,
-                .pos = { 2.0, 1.0, 0.0 }
+                .pos = { 2.0, 1.0, 0.0 },
+                .kc = 1.0,
+                .kl = 0.09,
+                .kq = 0.032
             }
         },
+        .spotLights = { },
         .directionalLights = {
             {
                 .color = { 1.0, 1.0, 1.0 },
-                .intensity = 0.2,
-                .dir = { 1.0, 4.0, -4.0 }
+                .intensity = 0.3,
+                .dir = { -4.0, -1.0, -1.0 }
             }
         },
         .viewport = cgfs::Viewport::with(

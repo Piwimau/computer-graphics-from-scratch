@@ -284,11 +284,38 @@ static constexpr Color compute_shading(
         f64 tMax = lightDir.norm();
         lightDir = lightDir.normalize();
         if (!is_blocked(lightDir, tMax)) {
+            f64 attenuation = 1.0
+                / (light.kc + light.kl * tMax + light.kq * tMax * tMax);
             local += material.diffuse * light.color * light.intensity
-                * diff(lightDir);
+                * diff(lightDir) * attenuation;
             if (material.shininess > 0.0) {
                 local += material.specular * light.color * light.intensity
-                    * spec(lightDir);
+                    * spec(lightDir) * attenuation;
+            }
+        }
+    }
+    for (const SpotLight& light : scene.spotLights) {
+        Vec3<f64> lightDir = light.pos - point;
+        f64 tMax = lightDir.norm();
+        lightDir = lightDir.normalize();
+        if (!is_blocked(lightDir, tMax)) {
+            f64 cosTheta = (-lightDir).dot(light.dir);
+            if (cosTheta <= light.outerCutoff) {
+                continue;
+            }
+            f64 spot = std::clamp(
+                (cosTheta - light.outerCutoff)
+                    / (light.innerCutoff - light.outerCutoff),
+                0.0,
+                1.0
+            );
+            f64 attenuation = spot
+                / (light.kc + light.kl * tMax + light.kq * tMax * tMax);
+            local += material.diffuse * light.color * light.intensity
+                * diff(lightDir) * attenuation;
+            if (material.shininess > 0.0) {
+                local += material.specular * light.color * light.intensity
+                    * spec(lightDir) * attenuation;
             }
         }
     }

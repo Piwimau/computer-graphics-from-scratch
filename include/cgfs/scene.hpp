@@ -26,6 +26,9 @@ struct Scene {
     /** @brief The point lights illuminating this scene. */
     std::vector<PointLight> pointLights;
 
+    /** @brief The spot lights illuminating this scene. */
+    std::vector<SpotLight> spotLights;
+
     /** @brief The directional lights illuminating this scene. */
     std::vector<DirectionalLight> directionalLights;
 
