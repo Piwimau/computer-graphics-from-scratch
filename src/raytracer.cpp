@@ -1,233 +1,333 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <concepts>
 #include <limits>
 #include <optional>
+#include <ranges>
+#include <type_traits>
 #include <utility>
-#include "cgfs/color.hpp"
 #include "cgfs/raytracer.hpp"
-#include "cgfs/types.hpp"
-#include "cgfs/vector.hpp"
 
 namespace cgfs {
 
-/** @brief Represents a ray of light. */
+/** @brief Represents a ray. */
 struct Ray {
 
-    /** @brief The point at which this ray originates. */
+    /** @brief The origin of the ray. */
     Vec3<f64> origin;
 
-    /** @brief The direction this ray travels in. */
-    Vec3<f64> direction;
+    /** @brief The direction of the ray. */
+    Vec3<f64> dir;
 
 };
 
+/** @brief Represents an interval. */
+struct Interval {
+
+    /** @brief The lower bound of this interval. */
+    f64 min;
+
+    /** @brief The upper bound of this interval (inclusive). */
+    f64 max;
+
+};
+
+/** @brief Represents a hit point of a ray with an object. */
+struct Hit {
+
+    /** @brief The index of the intersected object. */
+    isize idx;
+
+    /** @brief The index of the intersected triangle (if any). */
+    isize triangleIdx;
+
+    /** @brief The distance along the ray to the hit point. */
+    f64 t;
+
+};
+
+/** @brief A small offset to avoid self-intersections. */
+static constexpr f64 BIAS = 0.001;
+
+/** @brief Represents infinity for floating-point calculations. */
+static constexpr f64 INF = std::numeric_limits<f64>::infinity();
+
+/** @brief The epsilon for floating-point calculations. */
+static constexpr f64 EPS = std::numeric_limits<f64>::epsilon();
+
+/** @brief The background color used when no objects are hit. */
+static constexpr Color BACKGROUND_COLOR = BLACK;
+
 /**
- * @brief Finds the closest intersection of a ray with a collection of spheres.
+ * @brief Converts canvas coordinates to viewport coordinates.
  *
- * @param[in] ray     The ray to test for intersections.
- * @param[in] spheres A collection of spheres to test for intersections.
- * @param[in] tMin    The minimum distance along the ray to consider for
- *                    intersections.
- * @param[in] tMax    The maximum distance along the ray to consider for
- *                    intersections.
- * @return A pair containing the closest intersected sphere and the distance
- * along the ray, or `std::nullopt` if no intersection is found.
+ * @param[in] canvasPos  The position on the canvas.
+ * @param[in] viewport   The viewport to map the canvas coordinates to.
+ * @param[in] canvasSize The size of the canvas.
+ * @return The corresponding coordinates on the viewport.
  */
-static std::optional<std::pair<Sphere, f64>> closest_intersection(
-    const Ray& ray,
-    std::span<const Sphere> spheres,
-    f64 tMin,
-    f64 tMax
+static constexpr Vec3<f64> canvas_to_viewport(
+    const Vec2<isize>& canvasPos,
+    const Viewport& viewport,
+    const Vec2<isize>& canvasSize
 ) noexcept {
-    std::optional<std::pair<Sphere, f64>> closest;
-    for (const Sphere& sphere : spheres) {
-        Vec3<f64> co = ray.origin - sphere.center;
-        f64 a = ray.direction.dot(ray.direction);
-        f64 b = 2.0 * co.dot(ray.direction);
-        f64 c = co.dot(co) - sphere.radius * sphere.radius;
-        f64 discriminant = b * b - 4.0 * a * c;
-        if (discriminant < 0.0) {
-            continue;
-        }
-        f64 t1 = (-b - std::sqrt(discriminant)) / (2.0 * a);
-        if ((t1 >= tMin) && (t1 <= tMax)) {
-            if (!closest || (t1 < closest->second)) {
-                closest = std::make_pair(sphere, t1);
-            }
-        }
-        f64 t2 = (-b + std::sqrt(discriminant)) / (2.0 * a);
-        if ((t2 >= tMin) && (t2 <= tMax)) {
-            if (!closest || (t2 < closest->second)) {
-                closest = std::make_pair(sphere, t2);
-            }
-        }
-    }
-    return closest;
+    return {
+        .x = (static_cast<f64>(canvasPos.x) + 0.5) * viewport.width
+            / static_cast<f64>(canvasSize.x),
+        .y = (static_cast<f64>(canvasPos.y) + 0.5) * viewport.height
+            / static_cast<f64>(canvasSize.y),
+        .z = -viewport.distance
+    };
 }
 
 /**
- * @brief Computes the intensity of the light illuminating a point with a
- * specified surface normal.
+ * @brief Computes the intersection of a ray with a sphere.
  *
- * @param[in] point     The point to compute the lighting for.
- * @param[in] normal    The surface normal at that point.
- * @param[in] viewDir   The viewing direction from the point towards the camera.
- * @param[in] shininess The shininess of the surface at the point (if any).
- * @param[in] spheres   A collection of spheres representing the scene.
- * @param[in] lights    A collection of lights illuminating the scene.
- * @return The intensity of the light illuminating the specified point.
+ * @param[in]  sphere     The sphere to test for intersection.
+ * @param[in]  ray        The ray to test for intersection.
+ * @param[in]  t          The interval along the ray to consider for
+ *                        intersections.
+ * @param[out] closestHit The hit information if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
  */
-static f64 compute_lighting(
+static constexpr bool intersect(
+    const Sphere& sphere,
+    const Ray& ray,
+    Interval t,
+    Hit& closestHit
+) noexcept {
+    Vec3<f64> co = ray.origin - sphere.center;
+    f64 a = ray.dir.dot(ray.dir);
+    f64 b = 2.0 * co.dot(ray.dir);
+    f64 c = co.dot(co) - sphere.radius * sphere.radius;
+    f64 discriminant = b * b - 4.0 * a * c;
+    if (discriminant < 0.0) {
+        return false;
+    }
+    f64 t1 = (-b - std::sqrt(discriminant)) / (2.0 * a);
+    if ((t1 >= t.min) && (t1 <= t.max)) {
+        closestHit.t = t1;
+        return true;
+    }
+    f64 t2 = (-b + std::sqrt(discriminant)) / (2.0 * a);
+    if ((t2 >= t.min) && (t2 <= t.max)) {
+        closestHit.t = t2;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * @brief Computes the intersection of a ray with a mesh.
+ *
+ * @param[in]  mesh       The mesh to test for intersection.
+ * @param[in]  ray        The ray to test for intersection.
+ * @param[in]  t          The interval along the ray to consider for
+ *                        intersections.
+ * @param[out] closestHit The hit information if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
+ */
+static constexpr bool intersect(
+    const Mesh& mesh,
+    const Ray& ray,
+    Interval t,
+    Hit& closestHit
+) noexcept {
+    bool foundHit = false;
+    for (
+        const auto& [idx, indices]
+            : std::views::chunk(mesh.indices, 3)
+                | std::views::enumerate
+    ) {
+        Vec3<f64> v0 = mesh.vertices[indices[0]];
+        Vec3<f64> v1 = mesh.vertices[indices[1]];
+        Vec3<f64> v2 = mesh.vertices[indices[2]];
+        Vec3<f64> e0 = v1 - v0;
+        Vec3<f64> e1 = v2 - v0;
+        Vec3<f64> a = ray.dir.cross(e1);
+        f64 det = e0.dot(a);
+        if (std::abs(det) < EPS) {
+            continue;
+        }
+        f64 invDet = 1.0 / det;
+        Vec3<f64> b = ray.origin - v0;
+        f64 u = b.dot(a) * invDet;
+        if ((u < 0.0) || (u > 1.0)) {
+            continue;
+        }
+        Vec3<f64> c = b.cross(e0);
+        f64 v = ray.dir.dot(c) * invDet;
+        if ((v < 0.0) || (u + v > 1.0)) {
+            continue;
+        }
+        f64 tHit = e1.dot(c) * invDet;
+        if (
+            (tHit >= t.min) && (tHit <= t.max)
+                && (!foundHit || (tHit < closestHit.t))
+        ) {
+            closestHit.triangleIdx = idx;
+            closestHit.t = tHit;
+            foundHit = true;
+        }
+    }
+    return foundHit;
+}
+
+/**
+ * @brief Finds the closest intersection of a ray with a collection of objects.
+ *
+ * @param[in] objects A collection of objects to test for intersections.
+ * @param[in] ray     The ray to test for intersections.
+ * @param[in] t       The interval along the ray to consider for intersections.
+ * @return A hit containing the index of the closest intersected object and the
+ * distance along the ray, or `std::nullopt` if no intersection is found.
+ */
+static constexpr std::optional<Hit> closest_intersection(
+    std::span<const Object> objects,
+    const Ray& ray,
+    Interval t
+) noexcept {
+    std::optional<Hit> closestHit;
+    for (const auto& [idx, object] : std::views::enumerate(objects)) {
+        std::visit(
+            [&]<typename T>(const T& o) {
+                Hit hit = { .idx = idx, .triangleIdx = -1, .t = t.max };
+                if (
+                    intersect(o, ray, t, hit)
+                        && (!closestHit || (hit.t < closestHit->t))
+                ) {
+                    closestHit = hit;
+                }
+            },
+            object
+        );
+    }
+    return closestHit;
+}
+
+/**
+ * @brief Computes the shading at a point on a surface, accounting for the
+ * material properties, lights, and other objects in the scene.
+ *
+ * @param[in] point    The point to compute the shading for.
+ * @param[in] normal   The surface normal at that point.
+ * @param[in] viewDir  The viewing direction from the point towards the camera.
+ * @param[in] material The material of the surface at the point.
+ * @param[in] scene    The scene containing the objects and lights.
+ * @return The shading at the specified point.
+ */
+static constexpr Color compute_shading(
     const Vec3<f64>& point,
     const Vec3<f64>& normal,
     const Vec3<f64>& viewDir,
-    std::optional<f64> shininess,
-    std::span<const Sphere> spheres,
-    std::span<const Light> lights
+    const Material& material,
+    const Scene& scene
 ) noexcept {
-    f64 intensity = 0.0;
-    for (const Light& light : lights) {
-        std::visit(
-            [&]<typename T>(const T& l) {
-                if constexpr (std::same_as<T, AmbientLight>) {
-                    intensity += l.intensity;
-                }
-                else {
-                    Vec3<f64> lightDir;
-                    f64 tMax;
-                    if constexpr (std::same_as<T, PointLight>) {
-                        lightDir = l.position - point;
-                        tMax = 1.0;
-                    }
-                    else {
-                        lightDir = l.direction;
-                        tMax = std::numeric_limits<f64>::infinity();
-                    }
-                    Ray shadowRay = { .origin = point, .direction = lightDir };
-                    auto shadowIntersection = closest_intersection(
-                        shadowRay,
-                        spheres,
-                        0.001,
-                        tMax
-                    );
-                    if (shadowIntersection) {
-                        return;
-                    }
-                    intensity += l.intensity
-                        * std::max(normal.dot(lightDir), 0.0)
-                        / (normal.norm() * lightDir.norm());
-                    if (shininess) {
-                        Vec3<f64> reflectDir = lightDir.reflect(normal);
-                        intensity += l.intensity
-                            * std::pow(
-                                std::max(reflectDir.dot(viewDir), 0.0)
-                                    / (reflectDir.norm() * viewDir.norm()),
-                                *shininess
-                            );
-                    }
-                }
-            },
-            light
+    auto diffuse = [&](const Vec3<f64>& lightDir) {
+        return std::max(normal.dot(lightDir), 0.0)
+            / (normal.norm() * lightDir.norm());
+    };
+    auto specular = [&](const Vec3<f64>& lightDir) {
+        Vec3<f64> reflectDir = lightDir.reflect(normal);
+        return std::pow(
+            std::max(reflectDir.dot(viewDir), 0.0)
+                / (reflectDir.norm() * viewDir.norm()),
+            material.shininess
         );
+    };
+    auto shading = [&](const Vec3<f64>& lightDir, f64 tMax, f64 intensity) {
+        std::optional<Hit> hit = closest_intersection(
+            scene.objects,
+            { .origin = point, .dir = lightDir },
+            { .min = BIAS, .max = tMax }
+        );
+        if (hit) {
+            return BLACK;
+        }
+        Color result = material.diffuse * intensity * diffuse(lightDir);
+        if (material.shininess > 0.0) {
+            result += material.specular * intensity * specular(lightDir);
+        }
+        return result;
+    };
+    Color color = material.ambient * scene.ambientLight.intensity;
+    for (const PointLight& light : scene.pointLights) {
+        color += shading(light.pos - point, 1.0, light.intensity);
     }
-    return intensity;
+    for (const DirectionalLight& light : scene.directionalLights) {
+        color += shading(-light.dir, INF, light.intensity);
+    }
+    return color;
 }
 
 /**
  * @brief Traces a ray through a scene and returns the color of the closest
- * sphere it intersects with (if any).
+ * object it intersects with (if any).
  *
- * @param[in] ray     The ray to trace.
- * @param[in] spheres A collection of spheres representing the scene.
- * @param[in] lights  A collection of lights illuminating the scene.
- * @param[in] tMin    The minimum distance along the ray to consider for
- *                    intersections.
- * @param[in] tMax    The maximum distance along the ray to consider for
- *                    intersections.
- * @param[in] depth   The maximum recursion depth for reflective rays, `3` by
- *                    default.
- * @return The color of the closest sphere the ray intersects with, or black if
- * it does not intersect with any spheres.
+ * @param[in] scene The scene containing objects and lights.
+ * @param[in] ray   The ray to trace.
+ * @param[in] t     The interval along the ray to consider for intersections.
+ * @param[in] depth The maximum recursion depth.
+ * @return The color of the closest object the ray intersects with, or
+ * `BACKGROUND_COLOR` if it does not intersect with any objects.
  */
 static Color trace_ray(
+    const Scene& scene,
     const Ray& ray,
-    std::span<const Sphere> spheres,
-    std::span<const Light> lights,
-    f64 tMin,
-    f64 tMax,
-    isize depth = 3
+    Interval t,
+    isize depth = 8
 ) noexcept {
     assert(depth >= 0);
-    std::optional<std::pair<Sphere, f64>> closest = closest_intersection(
-        ray,
-        spheres,
-        tMin,
-        tMax
+    std::optional<Hit> hit = closest_intersection(scene.objects, ray, t);
+    if (!hit) {
+        return BACKGROUND_COLOR;
+    }
+    Vec3<f64> point = ray.origin + hit->t * ray.dir;
+    auto [normal, material] = std::visit(
+        [&]<typename T>(const T& object) {
+            Vec3<f64> n;
+            if constexpr (std::is_same_v<T, Sphere>) {
+                n = (point - object.center).normalize();
+            }
+            else {
+                Vec3<f64> v0 = object.vertices[hit->triangleIdx * 3];
+                Vec3<f64> v1 = object.vertices[hit->triangleIdx * 3 + 1];
+                Vec3<f64> v2 = object.vertices[hit->triangleIdx * 3 + 2];
+                n = (v1 - v0).cross(v2 - v0).normalize();
+            }
+            return std::make_pair(n, object.material);
+        },
+        scene.objects[hit->idx]
     );
-    if (!closest) {
-        return BLACK;
+    Color local = compute_shading(point, normal, -ray.dir, material, scene);
+    if ((depth == 0) || (material.reflectivity <= 0.0)) {
+        return local;
     }
-    const auto& [closestSphere, tClosest] = *closest;
-    Vec3<f64> point = ray.origin + tClosest * ray.direction;
-    Vec3<f64> normal = (point - closestSphere.center).normalize();
-    Color localColor = closestSphere.color
-        * compute_lighting(
-            point,
-            normal,
-            -ray.direction,
-            closestSphere.shininess,
-            spheres,
-            lights
-        );
-    if ((depth == 0) || !closestSphere.reflectiveness) {
-        return localColor;
-    }
-    Ray reflectRay = {
-        .origin = point,
-        .direction = (-ray.direction).reflect(normal)
-    };
-    Color reflectColor = trace_ray(
-        reflectRay,
-        spheres,
-        lights,
-        0.001,
-        std::numeric_limits<f64>::infinity(),
+    Color reflected = trace_ray(
+        scene,
+        { .origin = point, .dir = (-ray.dir).reflect(normal) },
+        { .min = BIAS, .max = INF },
         depth - 1
     );
-    return Color::lerp(localColor, reflectColor, *closestSphere.reflectiveness);
+    return Color::lerp(local, reflected, material.reflectivity);
 }
 
-void raytrace(
-    std::span<const Sphere> spheres,
-    std::span<const Light> lights,
-    const Camera& camera,
-    const Viewport& viewport,
-    Canvas& canvas
-) noexcept {
-    for (isize y = canvas.height() / 2 - 1; y >= -canvas.height() / 2; y--) {
-        for (isize x = -canvas.width() / 2; x <= canvas.width() / 2 - 1; x++) {
-            Vec3<f64> pos = {
-                .x = static_cast<f64>(x) * viewport.width
-                    / static_cast<f64>(canvas.width()),
-                .y = static_cast<f64>(y) * viewport.height
-                    / static_cast<f64>(canvas.height()),
-                .z = viewport.distance
-            };
+void raytrace(const Scene& scene, Canvas& canvas) {
+    for (isize y = canvas.max_y(); y >= canvas.min_y(); y--) {
+        for (isize x = canvas.min_x(); x <= canvas.max_x(); x++) {
+            Vec2<isize> canvasPos = { x, y };
+            Vec3<f64> viewportPos = canvas_to_viewport(
+                canvasPos,
+                scene.viewport,
+                { canvas.width(), canvas.height() }
+            );
             Ray ray = {
-                .origin = camera.position,
-                .direction = pos - camera.position
+                .origin = scene.camera.pos,
+                .dir = scene.camera.rot * viewportPos
             };
             canvas.draw_pixel(
-                { x, y },
-                trace_ray(
-                    ray,
-                    spheres,
-                    lights,
-                    1.0,
-                    std::numeric_limits<f64>::infinity()
-                )
+                canvasPos,
+                trace_ray(scene, ray, { .min = 1.0, .max = INF })
             );
         }
     }

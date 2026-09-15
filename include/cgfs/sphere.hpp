@@ -1,8 +1,7 @@
 #ifndef CGFS_SPHERE_HPP
 #define CGFS_SPHERE_HPP
 
-#include <optional>
-#include "cgfs/color.hpp"
+#include "cgfs/material.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
 
@@ -17,14 +16,8 @@ struct Sphere {
     /** @brief The radius of this sphere. */
     f64 radius;
 
-    /** @brief The color of this sphere. */
-    Color color;
-
-    /** @brief The shininess of this sphere (if any). */
-    std::optional<f64> shininess;
-
-    /** @brief The reflectiveness of this sphere (if any). */
-    std::optional<f64> reflectiveness;
+    /** @brief The material of this sphere. */
+    Material material;
 
 };
 
