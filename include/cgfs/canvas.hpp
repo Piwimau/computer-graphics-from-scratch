@@ -69,41 +69,13 @@ public:
     isize height() const noexcept;
 
     /**
-     * @brief Returns the minimum x-coordinate of this canvas.
+     * @brief Draws a colored pixel at a specified position.
      *
-     * @return The minimum x-coordinate of this canvas.
-     */
-    isize min_x() const noexcept;
-
-    /**
-     * @brief Returns the maximum x-coordinate of this canvas.
-     *
-     * @return The maximum x-coordinate of this canvas.
-     */
-    isize max_x() const noexcept;
-
-    /**
-     * @brief Returns the minimum y-coordinate of this canvas.
-     *
-     * @return The minimum y-coordinate of this canvas.
-     */
-    isize min_y() const noexcept;
-
-    /**
-     * @brief Returns the maximum y-coordinate of this canvas.
-     *
-     * @return The maximum y-coordinate of this canvas.
-     */
-    isize max_y() const noexcept;
-
-    /**
-     * @brief Draws a pixel at a specified position with a specified color.
-     *
-     * @note The origin of this canvas is placed at its center, with the
-     * positive x-axis pointing to the right and the positive y-axis pointing
-     * upwards. The x-coordinates of the pixels range from `min_x()` to
-     * `max_x()` (inclusive), while the y-coordinates range from `min_y()` to
-     * `max_y()` (inclusive).
+     * @note The origin of this canvas is placed in the top-left corner, with
+     * the positive x-axis pointing to the right and the positive y-axis
+     * pointing downwards. The coordinates of the pixels range from `(0, 0)` in
+     * the top-left corner to `(width() - 1, height() - 1)` in the bottom-right
+     * corner.
      *
      * @warning The behavior is undefined if `pos` is outside the bounds of this
      * canvas.

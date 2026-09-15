@@ -43,26 +43,9 @@ isize Canvas::height() const noexcept {
     return _height;
 }
 
-isize Canvas::min_x() const noexcept {
-    return -_width / 2;
-}
-
-isize Canvas::max_x() const noexcept {
-    return _width / 2 - 1;
-}
-
-isize Canvas::min_y() const noexcept {
-    return -_height / 2;
-}
-
-isize Canvas::max_y() const noexcept {
-    return _height / 2 - 1;
-}
-
 void Canvas::draw_pixel(Vec2<isize> pos, Rgb color) noexcept {
-    assert((pos.x >= min_x()) && (pos.x <= max_x()));
-    assert((pos.y >= min_y()) && (pos.y <= max_y()));
-    pos = { .x = pos.x - min_x(), .y = max_y() - pos.y };
+    assert((pos.x >= 0) && (pos.x < _width));
+    assert((pos.y >= 0) && (pos.y < _height));
     _pixels[pos.y * _width + pos.x] = color;
 }
 

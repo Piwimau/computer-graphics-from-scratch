@@ -41,7 +41,7 @@ int main() {
                 }
             },
             cgfs::Sphere {
-                .center = { 2.0, 1.0, -15.0 },
+                .center = { 2.0, 2.0, -15.0 },
                 .radius = 3.0,
                 .material = {
                     .ambient = { 1.0, 1.0, 1.0 },
