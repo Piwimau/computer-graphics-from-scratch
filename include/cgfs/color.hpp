@@ -2,7 +2,7 @@
 #define CGFS_COLOR_HPP
 
 #include <algorithm>
-#include <concepts>
+#include "cgfs/numeric.hpp"
 #include "cgfs/types.hpp"
 
 namespace cgfs {
@@ -81,8 +81,7 @@ struct Color {
      * @param[in] rhs The scalar to multiply by.
      * @return A reference to this color after the multiplication.
      */
-    template<typename T>
-    requires (std::integral<T> || std::floating_point<T>)
+    template<Numeric T>
     constexpr Color& operator*=(T rhs) noexcept {
         r = static_cast<u8>(
             std::clamp<f64>(r * static_cast<f64>(rhs), 0.0, 255.0)
@@ -105,8 +104,7 @@ struct Color {
      * @param[in] rhs The scalar to multiply by.
      * @return The result of multiplying the color by the scalar.
      */
-    template<typename T>
-    requires (std::integral<T> || std::floating_point<T>)
+    template<Numeric T>
     friend constexpr Color operator*(Color lhs, T rhs) noexcept {
         lhs *= rhs;
         return lhs;
@@ -121,8 +119,7 @@ struct Color {
      * @param[in] rhs The color to scale.
      * @return The result of multiplying the color by the scalar.
      */
-    template<typename T>
-    requires (std::integral<T> || std::floating_point<T>)
+    template<Numeric T>
     friend constexpr Color operator*(T lhs, Color rhs) noexcept {
         rhs *= lhs;
         return rhs;
@@ -136,8 +133,7 @@ struct Color {
      * @param[in] t The interpolation factor in the range `[0, 1]`.
      * @return The interpolated color.
      */
-    template<typename T>
-    requires (std::integral<T> || std::floating_point<T>)
+    template<Numeric T>
     static constexpr Color lerp(const Color& a, const Color& b, T t) noexcept {
         return a * (static_cast<T>(1) - t) + b * t;
     }

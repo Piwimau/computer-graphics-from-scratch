@@ -4,7 +4,6 @@
 #include <print>
 #include <stdexcept>
 #include "cgfs/ppm.hpp"
-#include "cgfs/types.hpp"
 #include "func-deleter.hpp"
 
 namespace cgfs {

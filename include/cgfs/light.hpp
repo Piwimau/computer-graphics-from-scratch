@@ -3,7 +3,7 @@
 
 #include <variant>
 #include "cgfs/types.hpp"
-#include "cgfs/vector.hpp"
+#include "cgfs/vec3.hpp"
 
 namespace cgfs {
 
