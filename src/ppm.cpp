@@ -15,19 +15,19 @@ void save_ppm(const Canvas& canvas, const std::string& path) {
     std::unique_ptr<std::FILE, FileDeleter> file(
         std::fopen(path.c_str(), "wb")
     );
-    if (!file) {
+    if (file == nullptr) {
         throw std::runtime_error(std::format("Failed to open '{}'.", path));
     }
     std::println(file.get(), "P6");
-    std::println(file.get(), "{} {}", canvas.width(), canvas.height());
+    std::println(file.get(), "{} {}", canvas.width, canvas.height);
     std::println(file.get(), "255");
     usize n = std::fwrite(
-        canvas.pixels().data(),
-        sizeof(Rgb),
-        canvas.pixels().size(),
+        canvas.pixels.get(),
+        sizeof(Pixel),
+        canvas.width * canvas.height,
         file.get()
     );
-    if (n != canvas.pixels().size()) {
+    if (static_cast<isize>(n) != canvas.width * canvas.height) {
         throw std::runtime_error(std::format("Failed to write to '{}'.", path));
     }
 }

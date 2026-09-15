@@ -4,7 +4,7 @@
 #include "cgfs/util.hpp"
 
 int main() {
-    cgfs::Canvas canvas(1280, 720);
+    cgfs::Canvas canvas = cgfs::Canvas::empty(1280, 720);
     cgfs::Scene scene = {
         .objects = {
             cgfs::Sphere {
@@ -95,8 +95,8 @@ int main() {
         },
         .viewport = cgfs::Viewport::with(
             cgfs::radians(60.0),
-            static_cast<cgfs::f64>(canvas.width())
-                / static_cast<cgfs::f64>(canvas.height())
+            static_cast<cgfs::f64>(canvas.width)
+                / static_cast<cgfs::f64>(canvas.height)
         ),
         .camera = cgfs::Camera::look({ 0.0, 0.0, 0.0 }, { 0.0, 0.0, -1.0 })
     };

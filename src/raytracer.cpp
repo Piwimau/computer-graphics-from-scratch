@@ -4,9 +4,8 @@
 #include <limits>
 #include <optional>
 #include <ranges>
-#include <type_traits>
-#include <utility>
 #include "cgfs/raytracer.hpp"
+#include "cgfs/vec2.hpp"
 
 namespace cgfs {
 
@@ -387,15 +386,15 @@ static constexpr Color gamma_correct(const Color& color) noexcept {
 void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
     assert(samples > 0);
     Vec2<f64> canvasSize = {
-        .x = static_cast<f64>(canvas.width()),
-        .y = static_cast<f64>(canvas.height())
+        .x = static_cast<f64>(canvas.width),
+        .y = static_cast<f64>(canvas.height)
     };
     Vec2<f64> viewportScale = {
         .x = scene.viewport.width / canvasSize.x,
         .y = scene.viewport.height / canvasSize.y
     };
-    for (isize y = 0; y < canvas.height(); y++) {
-        for (isize x = 0; x < canvas.width(); x++) {
+    for (isize y = 0; y < canvas.height; y++) {
+        for (isize x = 0; x < canvas.width; x++) {
             Color avg = { };
             for (isize sy = 0; sy < samples; sy++) {
                 for (isize sx = 0; sx < samples; sx++) {
@@ -421,12 +420,11 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
                 }
             }
             Color color = gamma_correct(avg);
-            Rgb rgb = {
+            canvas.pixels[y * canvas.width + x] = {
                 .r = static_cast<u8>(color.r * 255.0 + 0.5),
                 .g = static_cast<u8>(color.g * 255.0 + 0.5),
                 .b = static_cast<u8>(color.b * 255.0 + 0.5)
             };
-            canvas.draw_pixel({ x, y }, rgb);
         }
     }
 }

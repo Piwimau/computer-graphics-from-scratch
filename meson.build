@@ -50,7 +50,7 @@ deps += cpp.find_library('m', required: false)
 
 incs = include_directories('include')
 
-srcs = files('src/canvas.cpp', 'src/ppm.cpp', 'src/raytracer.cpp')
+srcs = files('src/ppm.cpp', 'src/raytracer.cpp')
 
 cgfs_lib = library(
     'cgfs',
