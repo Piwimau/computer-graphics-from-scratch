@@ -123,6 +123,35 @@ static constexpr std::optional<Hit> intersect(
 }
 
 /**
+ * @brief Computes the intersection of a ray with an axis-aligned bounding box.
+ *
+ * @param[in] bounds The axis-aligned bounding box to test for intersection.
+ * @param[in] ray    The ray to test for intersection.
+ * @param[in] t      The interval along the ray to consider for intersections.
+ * @return `true` if an intersection is found, otherwise `false`.
+ */
+static constexpr bool intersect(
+    const Aabb& bounds,
+    const Ray& ray,
+    Interval t
+) noexcept {
+    auto slab = [&](f64 min, f64 max, f64 origin, f64 dir) -> bool {
+        f64 invDir = 1.0 / dir;
+        f64 t0 = (min - origin) * invDir;
+        f64 t1 = (max - origin) * invDir;
+        if (invDir < 0.0) {
+            std::swap(t0, t1);
+        }
+        t.min = std::max(t.min, t0);
+        t.max = std::min(t.max, t1);
+        return t.max > t.min;
+    };
+    return slab(bounds.min.x, bounds.max.x, ray.origin.x, ray.dir.x)
+        && slab(bounds.min.y, bounds.max.y, ray.origin.y, ray.dir.y)
+        && slab(bounds.min.z, bounds.max.z, ray.origin.z, ray.dir.z);
+}
+
+/**
  * @brief Computes the intersection of a ray with a mesh.
  *
  * @param[in] mesh The mesh to test for intersection.
@@ -135,6 +164,9 @@ static constexpr std::optional<Hit> intersect(
     const Ray& ray,
     Interval t
 ) noexcept {
+    if (!intersect(mesh.bounds, ray, t)) {
+        return std::nullopt;
+    }
     std::optional<Hit> closestHit;
     f64 tClosest = INF;
     for (const auto& indices : std::views::chunk(mesh.indices, 3)) {

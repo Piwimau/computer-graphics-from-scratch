@@ -2,6 +2,7 @@
 #define CGFS_MESH_HPP
 
 #include <vector>
+#include "cgfs/aabb.hpp"
 #include "cgfs/material.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
@@ -16,6 +17,9 @@ struct Mesh {
 
     /** @brief The vertex indices forming the triangles of this mesh. */
     std::vector<isize> indices;
+
+    /** @brief The axis-aligned bounding box of this mesh. */
+    Aabb bounds;
 
     /** @brief The material of this mesh. */
     Material material;
