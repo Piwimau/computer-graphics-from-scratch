@@ -1,6 +1,7 @@
 #ifndef CGFS_LIGHT_HPP
 #define CGFS_LIGHT_HPP
 
+#include "cgfs/color.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
 
@@ -9,13 +10,19 @@ namespace cgfs {
 /** @brief Represents an ambient light with a constant intensity. */
 struct AmbientLight {
 
-    /** @brief The intensity of this ambient light. */
+    /** @brief The color of this light. */
+    Color color;
+
+    /** @brief The intensity of this light. */
     f64 intensity;
 
 };
 
 /** @brief Represents a point light radiating from a fixed position. */
 struct PointLight {
+
+    /** @brief The color of this light. */
+    Color color;
 
     /** @brief The intensity of this light. */
     f64 intensity;
@@ -27,6 +34,9 @@ struct PointLight {
 
 /** @brief Represents a directional light radiating in a fixed direction. */
 struct DirectionalLight {
+
+    /** @brief The color of this light. */
+    Color color;
 
     /** @brief The intensity of this light. */
     f64 intensity;

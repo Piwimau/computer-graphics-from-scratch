@@ -56,7 +56,10 @@ static constexpr f64 INF = std::numeric_limits<f64>::infinity();
 static constexpr f64 EPS = std::numeric_limits<f64>::epsilon();
 
 /** @brief The background color used when no objects are hit. */
-static constexpr Color BACKGROUND_COLOR = BLACK;
+static constexpr Color BACKGROUND_COLOR = { 0.0, 0.0, 0.0 };
+
+/** @brief The factor used for gamma correction. */
+static constexpr f64 GAMMA = 1.5;
 
 /**
  * @brief Converts canvas coordinates to viewport coordinates.
@@ -210,8 +213,9 @@ static constexpr std::optional<Hit> closest_intersection(
  * material properties, lights, and other objects in the scene.
  *
  * @param[in] point    The point to compute the shading for.
- * @param[in] normal   The surface normal at that point.
- * @param[in] viewDir  The viewing direction from the point towards the camera.
+ * @param[in] normal   The surface normal at that point (normalized).
+ * @param[in] viewDir  The direction from the point towards the camera
+ *                     (normalized).
  * @param[in] material The material of the surface at the point.
  * @param[in] scene    The scene containing the objects and lights.
  * @return The shading at the specified point.
@@ -223,41 +227,49 @@ static constexpr Color compute_shading(
     const Material& material,
     const Scene& scene
 ) noexcept {
-    auto diffuse = [&](const Vec3<f64>& lightDir) {
-        return std::max(normal.dot(lightDir), 0.0)
-            / (normal.norm() * lightDir.norm());
-    };
-    auto specular = [&](const Vec3<f64>& lightDir) {
-        Vec3<f64> reflectDir = lightDir.reflect(normal);
-        return std::pow(
-            std::max(reflectDir.dot(viewDir), 0.0)
-                / (reflectDir.norm() * viewDir.norm()),
-            material.shininess
-        );
-    };
-    auto shading = [&](const Vec3<f64>& lightDir, f64 tMax, f64 intensity) {
+    auto is_blocked = [&](const Vec3<f64>& lightDir, f64 tMax) -> bool {
         std::optional<Hit> hit = closest_intersection(
             scene.objects,
             { .origin = point, .dir = lightDir },
             { .min = BIAS, .max = tMax }
         );
-        if (hit) {
-            return BLACK;
-        }
-        Color result = material.diffuse * intensity * diffuse(lightDir);
-        if (material.shininess > 0.0) {
-            result += material.specular * intensity * specular(lightDir);
-        }
-        return result;
+        return hit != std::nullopt;
     };
-    Color color = material.ambient * scene.ambientLight.intensity;
+    auto diff = [&](const Vec3<f64>& lightDir) -> f64 {
+        return std::max(normal.dot(lightDir), 0.0);
+    };
+    auto spec = [&](const Vec3<f64>& lightDir) -> f64 {
+        Vec3<f64> halfDir = (lightDir + viewDir).normalize();
+        return std::pow(std::max(normal.dot(halfDir), 0.0), material.shininess);
+    };
+    Color local = material.ambient * scene.ambientLight.color
+        * scene.ambientLight.intensity;
     for (const PointLight& light : scene.pointLights) {
-        color += shading(light.pos - point, 1.0, light.intensity);
+        Vec3<f64> lightDir = light.pos - point;
+        f64 tMax = lightDir.norm();
+        lightDir = lightDir.normalize();
+        if (!is_blocked(lightDir, tMax)) {
+            local += material.diffuse * light.color * light.intensity
+                * diff(lightDir);
+            if (material.shininess > 0.0) {
+                local += material.specular * light.color * light.intensity
+                    * spec(lightDir);
+            }
+        }
     }
     for (const DirectionalLight& light : scene.directionalLights) {
-        color += shading(-light.dir, INF, light.intensity);
+        Vec3<f64> lightDir = (-light.dir).normalize();
+        f64 tMax = INF;
+        if (!is_blocked(lightDir, tMax)) {
+            local += material.diffuse * light.color * light.intensity
+                * diff(lightDir);
+            if (material.shininess > 0.0) {
+                local += material.specular * light.color * light.intensity
+                    * spec(lightDir);
+            }
+        }
     }
-    return color;
+    return local;
 }
 
 /**
@@ -299,10 +311,22 @@ static Color trace_ray(
         },
         scene.objects[hit->idx]
     );
-    Color local = compute_shading(point, normal, -ray.dir, material, scene);
     if ((depth == 0) || (material.reflectivity <= 0.0)) {
-        return local;
+        return compute_shading(
+            point,
+            normal,
+            (-ray.dir).normalize(),
+            material,
+            scene
+        );
     }
+    Color local = compute_shading(
+        point,
+        normal,
+        (-ray.dir).normalize(),
+        material,
+        scene
+    );
     Color reflected = trace_ray(
         scene,
         { .origin = point, .dir = (-ray.dir).reflect(normal) },
@@ -310,6 +334,20 @@ static Color trace_ray(
         depth - 1
     );
     return Color::lerp(local, reflected, material.reflectivity);
+}
+
+/**
+ * @brief Applies gamma correction to a color.
+ *
+ * @param[in] color The color to correct.
+ * @return The gamma-corrected color.
+ */
+static constexpr Color gamma_correct(const Color& color) noexcept {
+    return {
+        .r = std::pow(color.r, 1.0 / GAMMA),
+        .g = std::pow(color.g, 1.0 / GAMMA),
+        .b = std::pow(color.b, 1.0 / GAMMA)
+    };
 }
 
 void raytrace(const Scene& scene, Canvas& canvas) {
@@ -325,9 +363,16 @@ void raytrace(const Scene& scene, Canvas& canvas) {
                 .origin = scene.camera.pos,
                 .dir = scene.camera.rot * viewportPos
             };
+            Color color = gamma_correct(
+                trace_ray(scene, ray, { .min = 1.0, .max = INF })
+            );
             canvas.draw_pixel(
                 canvasPos,
-                trace_ray(scene, ray, { .min = 1.0, .max = INF })
+                {
+                    .r = static_cast<u8>(color.r * 255.0 + 0.5),
+                    .g = static_cast<u8>(color.g * 255.0 + 0.5),
+                    .b = static_cast<u8>(color.b * 255.0 + 0.5)
+                }
             );
         }
     }

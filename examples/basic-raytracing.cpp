@@ -11,9 +11,9 @@ int main() {
                 .center = { -1.5, -0.6, -2.2 },
                 .radius = 0.4,
                 .material = {
-                    .ambient = { 255, 255, 255 },
-                    .diffuse = { 255, 255, 255 },
-                    .specular = { 255, 255, 255 },
+                    .ambient = { 1.0, 1.0, 1.0 },
+                    .diffuse = { 1.0, 1.0, 1.0 },
+                    .specular = { 1.0, 1.0, 1.0 },
                     .shininess = 100.0,
                     .reflectivity = 1.0
                 }
@@ -22,9 +22,9 @@ int main() {
                 .center = { -2.0, 0.0, -4.0 },
                 .radius = 1.0,
                 .material = {
-                    .ambient = { 0, 255, 0 },
-                    .diffuse = { 0, 255, 0 },
-                    .specular = { 0, 255, 0 },
+                    .ambient = { 0.0, 1.0, 0.0 },
+                    .diffuse = { 0.0, 1.0, 0.0 },
+                    .specular = { 0.0, 1.0, 0.0 },
                     .shininess = 10.0,
                     .reflectivity = 0.4
                 }
@@ -33,9 +33,9 @@ int main() {
                 .center = { 0.0, -1.0, -3.0 },
                 .radius = 1.0,
                 .material = {
-                    .ambient = { 255, 0, 0 },
-                    .diffuse = { 255, 0, 0 },
-                    .specular = { 255, 0, 0 },
+                    .ambient = { 1.0, 0.0, 0.0 },
+                    .diffuse = { 1.0, 0.0, 0.0 },
+                    .specular = { 1.0, 0.0, 0.0 },
                     .shininess = 500.0,
                     .reflectivity = 0.2
                 }
@@ -44,9 +44,9 @@ int main() {
                 .center = { 2.0, 1.0, -15.0 },
                 .radius = 3.0,
                 .material = {
-                    .ambient = { 255, 255, 255 },
-                    .diffuse = { 255, 255, 255 },
-                    .specular = { 255, 255, 255 },
+                    .ambient = { 1.0, 1.0, 1.0 },
+                    .diffuse = { 1.0, 1.0, 1.0 },
+                    .specular = { 1.0, 1.0, 1.0 },
                     .shininess = 100.0,
                     .reflectivity = 1.0
                 }
@@ -55,9 +55,9 @@ int main() {
                 .center = { 2.0, 0.0, -4.0 },
                 .radius = 1.0,
                 .material = {
-                    .ambient = { 0, 0, 255 },
-                    .diffuse = { 0, 0, 255 },
-                    .specular = { 0, 0, 255 },
+                    .ambient = { 0.0, 0.0, 1.0 },
+                    .diffuse = { 0.0, 0.0, 1.0 },
+                    .specular = { 0.0, 0.0, 1.0 },
                     .shininess = 500.0,
                     .reflectivity = 0.3
                 }
@@ -66,18 +66,28 @@ int main() {
                 .center = { 0.0, -5001.0, 0.0 },
                 .radius = 5000.0,
                 .material = {
-                    .ambient = { 255, 255, 0 },
-                    .diffuse = { 255, 255, 0 },
-                    .specular = { 255, 255, 0 },
+                    .ambient = { 1.0, 1.0, 0.0 },
+                    .diffuse = { 1.0, 1.0, 0.0 },
+                    .specular = { 1.0, 1.0, 0.0 },
                     .shininess = 1000.0,
                     .reflectivity = 0.5
                 }
             }
         },
-        .ambientLight = { .intensity = 0.2 },
-        .pointLights = { { .intensity = 0.6, .pos = { 2.0, 1.0, 0.0 } } },
+        .ambientLight = { .color = { 1.0, 1.0, 1.0 }, .intensity = 0.2 },
+        .pointLights = {
+            {
+                .color = { 1.0, 1.0, 1.0 },
+                .intensity = 0.6,
+                .pos = { 2.0, 1.0, 0.0 }
+            }
+        },
         .directionalLights = {
-            { .intensity = 0.2, .dir = { 1.0, 4.0, -4.0 } }
+            {
+                .color = { 1.0, 1.0, 1.0 },
+                .intensity = 0.2,
+                .dir = { 1.0, 4.0, -4.0 }
+            }
         },
         .viewport = cgfs::Viewport::with(
             cgfs::radians(60.0),

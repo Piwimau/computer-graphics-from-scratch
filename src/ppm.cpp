@@ -23,7 +23,7 @@ void save_ppm(const Canvas& canvas, const std::string& path) {
     std::println(file.get(), "255");
     usize n = std::fwrite(
         canvas.pixels().data(),
-        sizeof(Color),
+        sizeof(Rgb),
         canvas.pixels().size(),
         file.get()
     );

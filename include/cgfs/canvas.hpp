@@ -3,18 +3,31 @@
 
 #include <memory>
 #include <span>
-#include "cgfs/color.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec2.hpp"
 
 namespace cgfs {
+
+/** @brief Represents a color in the RGB888 color format. */
+struct Rgb {
+
+    /** @brief The red component of the color. */
+    u8 r;
+
+    /** @brief The green component of the color. */
+    u8 g;
+
+    /** @brief The blue component of the color. */
+    u8 b;
+
+};
 
 /** @brief Represents a two-dimensional canvas that can be drawn to. */
 class Canvas final {
 private:
 
     /** @brief The pixels of this canvas. */
-    std::unique_ptr<Color[]> _pixels;
+    std::unique_ptr<Rgb[]> _pixels;
 
     /** @brief The width of this canvas. */
     isize _width;
@@ -39,7 +52,7 @@ public:
      *
      * @return The pixels of this canvas in row-major order.
      */
-    std::span<const Color> pixels() const noexcept;
+    std::span<const Rgb> pixels() const noexcept;
 
     /**
      * @brief Returns the width of this canvas.
@@ -98,7 +111,7 @@ public:
      * @param[in] pos   The position of the pixel.
      * @param[in] color The color of the pixel.
      */
-    void draw_pixel(Vec2<isize> pos, Color color) noexcept;
+    void draw_pixel(Vec2<isize> pos, Rgb color) noexcept;
 
 };
 

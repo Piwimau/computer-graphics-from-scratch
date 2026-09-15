@@ -4,6 +4,9 @@
 
 namespace cgfs {
 
+/** @brief The default color of pixels. */
+static constexpr Rgb BLACK = { 0, 0, 0 };
+
 /**
  * @brief Creates an array of pixels with a specified width and height.
  *
@@ -15,10 +18,10 @@ namespace cgfs {
  * @param[in] height The height of the array.
  * @return The array of pixels.
  */
-static std::unique_ptr<Color[]> make_pixels(isize width, isize height) {
+static std::unique_ptr<Rgb[]> make_pixels(isize width, isize height) {
     assert(width >= 0);
     assert(height >= 0);
-    auto pixels = std::make_unique_for_overwrite<Color[]>(width * height);
+    auto pixels = std::make_unique_for_overwrite<Rgb[]>(width * height);
     std::ranges::fill_n(pixels.get(), width * height, BLACK);
     return pixels;
 }
@@ -28,8 +31,8 @@ Canvas::Canvas(isize width, isize height)
       _width(width),
       _height(height) { }
 
-std::span<const Color> Canvas::pixels() const noexcept {
-    return std::span<const Color>(_pixels.get(), _width * _height);
+std::span<const Rgb> Canvas::pixels() const noexcept {
+    return std::span<const Rgb>(_pixels.get(), _width * _height);
 }
 
 isize Canvas::width() const noexcept {
@@ -56,7 +59,7 @@ isize Canvas::max_y() const noexcept {
     return _height / 2 - 1;
 }
 
-void Canvas::draw_pixel(Vec2<isize> pos, Color color) noexcept {
+void Canvas::draw_pixel(Vec2<isize> pos, Rgb color) noexcept {
     assert((pos.x >= min_x()) && (pos.x <= max_x()));
     assert((pos.y >= min_y()) && (pos.y <= max_y()));
     pos = { .x = pos.x - min_x(), .y = max_y() - pos.y };

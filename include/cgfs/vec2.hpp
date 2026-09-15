@@ -1,6 +1,7 @@
 #ifndef CGFS_VEC2_HPP
 #define CGFS_VEC2_HPP
 
+#include <algorithm>
 #include <cmath>
 #include <concepts>
 #include <optional>
@@ -37,8 +38,8 @@ struct Vec2 {
     /**
      * @brief Adds two vectors (component-wise).
      *
-     * @param[in] lhs The first vector.
-     * @param[in] rhs The second vector.
+     * @param[in] lhs The vector to add to.
+     * @param[in] rhs The vector to add.
      * @return The result of adding the two vectors together.
      */
     friend constexpr Vec2<T> operator+(
@@ -64,8 +65,8 @@ struct Vec2 {
     /**
      * @brief Subtracts two vectors (component-wise).
      *
-     * @param[in] lhs The first vector.
-     * @param[in] rhs The second vector.
+     * @param[in] lhs The vector to subtract from.
+     * @param[in] rhs The vector to subtract.
      * @return The result of subtracting the second vector from the first.
      */
     friend constexpr Vec2<T> operator-(
@@ -122,6 +123,33 @@ struct Vec2 {
     }
 
     /**
+     * @brief Multiplies this vector by another vector (component-wise).
+     *
+     * @param[in] rhs The vector to multiply by.
+     * @return A reference to this vector after the multiplication.
+     */
+    constexpr Vec2<T>& operator*=(const Vec2<T>& rhs) noexcept {
+        x *= rhs.x;
+        y *= rhs.y;
+        return *this;
+    }
+
+    /**
+     * @brief Multiplies two vectors (component-wise).
+     *
+     * @param[in] lhs The vector to scale.
+     * @param[in] rhs The vector to multiply by.
+     * @return The result of multiplying the two vectors.
+     */
+    friend constexpr Vec2<T> operator*(
+        Vec2<T> lhs,
+        const Vec2<T>& rhs
+    ) noexcept {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    /**
      * @brief Divides this vector by a scalar (component-wise).
      *
      * @param[in] rhs The scalar to divide by.
@@ -141,6 +169,33 @@ struct Vec2 {
      * @return The result of dividing the vector by the scalar.
      */
     friend constexpr Vec2<T> operator/(Vec2<T> lhs, T rhs) noexcept {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    /**
+     * @brief Divides this vector by another vector (component-wise).
+     *
+     * @param[in] rhs The vector to divide by.
+     * @return A reference to this vector after the division.
+     */
+    constexpr Vec2<T>& operator/=(const Vec2<T>& rhs) noexcept {
+        x /= rhs.x;
+        y /= rhs.y;
+        return *this;
+    }
+
+    /**
+     * @brief Divides two vectors (component-wise).
+     *
+     * @param[in] lhs The vector to divide.
+     * @param[in] rhs The vector to divide by.
+     * @return The result of dividing the two vectors.
+     */
+    friend constexpr Vec2<T> operator/(
+        Vec2<T> lhs,
+        const Vec2<T>& rhs
+    ) noexcept {
         lhs /= rhs;
         return lhs;
     }
@@ -217,6 +272,34 @@ struct Vec2 {
         }
         T cosThetaT = std::sqrt(static_cast<T>(1) - sin2ThetaI);
         return eta * *this + (eta * cosThetaI - cosThetaT) * normal;
+    }
+
+    /**
+     * @brief Clamps the components of this vector between a minimum and maximum
+     * value.
+     *
+     * @param[in] min The minimum value.
+     * @param[in] max The maximum value (inclusive).
+     * @return The clamped vector.
+     */
+    constexpr Vec2<T> clamp(T min, T max) const noexcept {
+        return { std::clamp(x, min, max), std::clamp(y, min, max) };
+    }
+
+    /**
+     * @brief Computes the linear interpolation between two vectors.
+     *
+     * @param[in] a The vector at `t = 0.0`.
+     * @param[in] b The vector at `t = 1.0`.
+     * @param[in] t The interpolation parameter in the range `[0.0, 1.0]`.
+     * @return The interpolated vector.
+     */
+    static constexpr Vec2<T> lerp(
+        const Vec2<T>& a,
+        const Vec2<T>& b,
+        T t
+    ) noexcept requires std::floating_point<T> {
+        return a + (b - a) * t;
     }
 
 };
