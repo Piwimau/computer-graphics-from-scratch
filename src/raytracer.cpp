@@ -32,17 +32,20 @@ struct Interval {
 
 };
 
-/** @brief Represents a hit point of a ray with an object. */
+/** @brief Represents a hit of a ray with an object. */
 struct Hit {
-
-    /** @brief The index of the intersected object. */
-    isize idx;
-
-    /** @brief The index of the intersected triangle (if any). */
-    isize triangleIdx;
 
     /** @brief The distance along the ray to the hit point. */
     f64 t;
+
+    /** @brief The hit point. */
+    Vec3<f64> point;
+
+    /** @brief The surface normal at the hit point. */
+    Vec3<f64> normal;
+
+    /** @brief The material at the hit point. */
+    const Material* material;
 
 };
 
@@ -86,18 +89,15 @@ static constexpr Vec3<f64> canvas_to_viewport(
 /**
  * @brief Computes the intersection of a ray with a sphere.
  *
- * @param[in]  sphere     The sphere to test for intersection.
- * @param[in]  ray        The ray to test for intersection.
- * @param[in]  t          The interval along the ray to consider for
- *                        intersections.
- * @param[out] closestHit The hit information if an intersection is found.
- * @return `true` if an intersection is found, otherwise `false`.
+ * @param[in] sphere The sphere to test for intersection.
+ * @param[in] ray    The ray to test for intersection.
+ * @param[in] t      The interval along the ray to consider for intersections.
+ * @return A hit if an intersection is found, otherwise `std::nullopt`.
  */
-static constexpr bool intersect(
+static constexpr std::optional<Hit> intersect(
     const Sphere& sphere,
     const Ray& ray,
-    Interval t,
-    Hit& closestHit
+    Interval t
 ) noexcept {
     Vec3<f64> co = ray.origin - sphere.center;
     f64 a = ray.dir.dot(ray.dir);
@@ -105,43 +105,39 @@ static constexpr bool intersect(
     f64 c = co.dot(co) - sphere.radius * sphere.radius;
     f64 discriminant = b * b - 4.0 * a * c;
     if (discriminant < 0.0) {
-        return false;
+        return std::nullopt;
     }
     f64 t1 = (-b - std::sqrt(discriminant)) / (2.0 * a);
     if ((t1 >= t.min) && (t1 <= t.max)) {
-        closestHit.t = t1;
-        return true;
+        Vec3<f64> point = ray.origin + t1 * ray.dir;
+        Vec3<f64> normal = (point - sphere.center).normalize();
+        return Hit { t1, point, normal, &sphere.material };
     }
     f64 t2 = (-b + std::sqrt(discriminant)) / (2.0 * a);
     if ((t2 >= t.min) && (t2 <= t.max)) {
-        closestHit.t = t2;
-        return true;
+        Vec3<f64> point = ray.origin + t2 * ray.dir;
+        Vec3<f64> normal = (point - sphere.center).normalize();
+        return Hit { t2, point, normal, &sphere.material };
     }
-    return false;
+    return std::nullopt;
 }
 
 /**
  * @brief Computes the intersection of a ray with a mesh.
  *
- * @param[in]  mesh       The mesh to test for intersection.
- * @param[in]  ray        The ray to test for intersection.
- * @param[in]  t          The interval along the ray to consider for
- *                        intersections.
- * @param[out] closestHit The hit information if an intersection is found.
- * @return `true` if an intersection is found, otherwise `false`.
+ * @param[in] mesh The mesh to test for intersection.
+ * @param[in] ray  The ray to test for intersection.
+ * @param[in] t    The interval along the ray to consider for intersections.
+ * @return A hit if an intersection is found, otherwise `std::nullopt`.
  */
-static constexpr bool intersect(
+static constexpr std::optional<Hit> intersect(
     const Mesh& mesh,
     const Ray& ray,
-    Interval t,
-    Hit& closestHit
+    Interval t
 ) noexcept {
-    bool foundHit = false;
-    for (
-        const auto& [idx, indices]
-            : std::views::chunk(mesh.indices, 3)
-                | std::views::enumerate
-    ) {
+    std::optional<Hit> closestHit;
+    f64 tClosest = INF;
+    for (const auto& indices : std::views::chunk(mesh.indices, 3)) {
         Vec3<f64> v0 = mesh.vertices[indices[0]];
         Vec3<f64> v1 = mesh.vertices[indices[1]];
         Vec3<f64> v2 = mesh.vertices[indices[2]];
@@ -166,14 +162,18 @@ static constexpr bool intersect(
         f64 tHit = e1.dot(c) * invDet;
         if (
             (tHit >= t.min) && (tHit <= t.max)
-                && (!foundHit || (tHit < closestHit.t))
+                && (!closestHit || (tHit < tClosest))
         ) {
-            closestHit.triangleIdx = idx;
-            closestHit.t = tHit;
-            foundHit = true;
+            closestHit = {
+                .t = tHit,
+                .point = ray.origin + tHit * ray.dir,
+                .normal = e0.cross(e1).normalize(),
+                .material = &mesh.material
+            };
+            tClosest = tHit;
         }
     }
-    return foundHit;
+    return closestHit;
 }
 
 /**
@@ -191,15 +191,18 @@ static constexpr std::optional<Hit> closest_intersection(
     Interval t
 ) noexcept {
     std::optional<Hit> closestHit;
-    for (const auto& [idx, object] : std::views::enumerate(objects)) {
+    f64 tClosest = INF;
+    for (const Object& object : objects) {
         std::visit(
             [&]<typename T>(const T& o) {
-                Hit hit = { .idx = idx, .triangleIdx = -1, .t = t.max };
-                if (
-                    intersect(o, ray, t, hit)
-                        && (!closestHit || (hit.t < closestHit->t))
-                ) {
+                std::optional<Hit> hit = intersect(
+                    o,
+                    ray,
+                    { .min = t.min, .max = closestHit ? tClosest : t.max }
+                );
+                if (hit && (!closestHit || (hit->t < tClosest))) {
                     closestHit = hit;
+                    tClosest = hit->t;
                 }
             },
             object
@@ -294,46 +297,29 @@ static Color trace_ray(
     if (!hit) {
         return BACKGROUND_COLOR;
     }
-    Vec3<f64> point = ray.origin + hit->t * ray.dir;
-    auto [normal, material] = std::visit(
-        [&]<typename T>(const T& object) {
-            Vec3<f64> n;
-            if constexpr (std::is_same_v<T, Sphere>) {
-                n = (point - object.center).normalize();
-            }
-            else {
-                Vec3<f64> v0 = object.vertices[hit->triangleIdx * 3];
-                Vec3<f64> v1 = object.vertices[hit->triangleIdx * 3 + 1];
-                Vec3<f64> v2 = object.vertices[hit->triangleIdx * 3 + 2];
-                n = (v1 - v0).cross(v2 - v0).normalize();
-            }
-            return std::make_pair(n, object.material);
-        },
-        scene.objects[hit->idx]
-    );
-    if ((depth == 0) || (material.reflectivity <= 0.0)) {
+    if ((depth == 0) || (hit->material->reflectivity <= 0.0)) {
         return compute_shading(
-            point,
-            normal,
+            hit->point,
+            hit->normal,
             (-ray.dir).normalize(),
-            material,
+            *hit->material,
             scene
         );
     }
     Color local = compute_shading(
-        point,
-        normal,
+        hit->point,
+        hit->normal,
         (-ray.dir).normalize(),
-        material,
+        *hit->material,
         scene
     );
     Color reflected = trace_ray(
         scene,
-        { .origin = point, .dir = (-ray.dir).reflect(normal) },
+        { .origin = hit->point, .dir = (-ray.dir).reflect(hit->normal) },
         { .min = BIAS, .max = INF },
         depth - 1
     );
-    return Color::lerp(local, reflected, material.reflectivity);
+    return Color::lerp(local, reflected, hit->material->reflectivity);
 }
 
 /**
