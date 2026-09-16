@@ -298,6 +298,46 @@ struct Vec3 {
     }
 
     /**
+     * @brief Returns the minimum component of this vector.
+     *
+     * @return The minimum component of this vector.
+     */
+    constexpr T min() const noexcept {
+        return std::min({ x, y, z });
+    }
+
+    /**
+     * @brief Returns the component-wise minimum of this vector and another
+     * vector.
+     *
+     * @param[in] rhs The other vector.
+     * @return The component-wise minimum of this vector and another vector.
+     */
+    constexpr Vec3<T> min(const Vec3<T>& rhs) const noexcept {
+        return { std::min(x, rhs.x), std::min(y, rhs.y), std::min(z, rhs.z) };
+    }
+
+    /**
+     * @brief Returns the maximum component of this vector.
+     *
+     * @return The maximum component of this vector.
+     */
+    constexpr T max() const noexcept {
+        return std::max({ x, y, z });
+    }
+
+    /**
+     * @brief Returns the component-wise maximum of this vector and another
+     * vector.
+     *
+     * @param[in] rhs The other vector.
+     * @return The component-wise maximum of this vector and another vector.
+     */
+    constexpr Vec3<T> max(const Vec3<T>& rhs) const noexcept {
+        return { std::max(x, rhs.x), std::max(y, rhs.y), std::max(z, rhs.z) };
+    }
+
+    /**
      * @brief Clamps the components of this vector between a minimum and maximum
      * value.
      *

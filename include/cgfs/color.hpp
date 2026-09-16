@@ -25,9 +25,9 @@ struct Color {
      * @return A reference to this color after addition.
      */
     constexpr Color& operator+=(const Color& rhs) noexcept {
-        r = std::clamp(r + rhs.r, 0.0, 1.0);
-        g = std::clamp(g + rhs.g, 0.0, 1.0);
-        b = std::clamp(b + rhs.b, 0.0, 1.0);
+        r = r + rhs.r;
+        g = g + rhs.g;
+        b = b + rhs.b;
         return *this;
     }
 
@@ -50,9 +50,9 @@ struct Color {
      * @return A reference to this color after subtraction.
      */
     constexpr Color& operator-=(const Color& rhs) noexcept {
-        r = std::clamp(r - rhs.r, 0.0, 1.0);
-        g = std::clamp(g - rhs.g, 0.0, 1.0);
-        b = std::clamp(b - rhs.b, 0.0, 1.0);
+        r = r - rhs.r;
+        g = g - rhs.g;
+        b = b - rhs.b;
         return *this;
     }
 
@@ -71,13 +71,13 @@ struct Color {
     /**
      * @brief Multiplies this color by a scalar (component-wise).
      *
-     * @param rhs The scalar to multiply by.
+     * @param[in] rhs The scalar to multiply by.
      * @return A reference to this color after multiplication.
      */
     constexpr Color& operator*=(f64 rhs) noexcept {
-        r = std::clamp(r * rhs, 0.0, 1.0);
-        g = std::clamp(g * rhs, 0.0, 1.0);
-        b = std::clamp(b * rhs, 0.0, 1.0);
+        r = r * rhs;
+        g = g * rhs;
+        b = b * rhs;
         return *this;
     }
 
@@ -112,9 +112,9 @@ struct Color {
      * @return A reference to this color after multiplication.
      */
     constexpr Color& operator*=(const Color& rhs) noexcept {
-        r = std::clamp(r * rhs.r, 0.0, 1.0);
-        g = std::clamp(g * rhs.g, 0.0, 1.0);
-        b = std::clamp(b * rhs.b, 0.0, 1.0);
+        r = r * rhs.r;
+        g = g * rhs.g;
+        b = b * rhs.b;
         return *this;
     }
 
@@ -128,6 +128,111 @@ struct Color {
     friend constexpr Color operator*(Color lhs, const Color& rhs) noexcept {
         lhs *= rhs;
         return lhs;
+    }
+
+    /**
+     * @brief Divides this color by a scalar (component-wise).
+     *
+     * @param[in] rhs The scalar to divide by.
+     * @return A reference to this color after division.
+     */
+    constexpr Color& operator/=(f64 rhs) noexcept {
+        r = r / rhs;
+        g = g / rhs;
+        b = b / rhs;
+        return *this;
+    }
+
+    /**
+     * @brief Divides a color by a scalar (component-wise).
+     *
+     * @param[in] lhs The color to scale.
+     * @param[in] rhs The scalar to divide by.
+     * @return The result of dividing the color by the scalar.
+     */
+    friend constexpr Color operator/(Color lhs, f64 rhs) noexcept {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    /**
+     * @brief Divides this color by another color (component-wise).
+     *
+     * @param[in] rhs The color to divide by.
+     * @return A reference to this color after division.
+     */
+    constexpr Color& operator/=(const Color& rhs) noexcept {
+        r = r / rhs.r;
+        g = g / rhs.g;
+        b = b / rhs.b;
+        return *this;
+    }
+
+    /**
+     * @brief Divides two colors (component-wise).
+     *
+     * @param[in] lhs The color to divide.
+     * @param[in] rhs The color to divide by.
+     * @return The result of dividing the first color by the second.
+     */
+    friend constexpr Color operator/(Color lhs, const Color& rhs) noexcept {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    /**
+     * @brief Returns the minimum component of this color.
+     *
+     * @return The minimum component of this color.
+     */
+    constexpr f64 min() const noexcept {
+        return std::min({ r, g, b });
+    }
+
+    /**
+     * @brief Returns the component-wise minimum of this color and another
+     * color.
+     *
+     * @param[in] rhs The other color.
+     * @return The component-wise minimum of this color and another color.
+     */
+    constexpr Color min(const Color& rhs) const noexcept {
+        return { std::min(r, rhs.r), std::min(g, rhs.g), std::min(b, rhs.b) };
+    }
+
+    /**
+     * @brief Returns the maximum component of this color.
+     *
+     * @return The maximum component of this color.
+     */
+    constexpr f64 max() const noexcept {
+        return std::max({ r, g, b });
+    }
+
+    /**
+     * @brief Returns the component-wise maximum of this color and another
+     * color.
+     *
+     * @param[in] rhs The other color.
+     * @return The component-wise maximum of this color and another color.
+     */
+    constexpr Color max(const Color& rhs) const noexcept {
+        return { std::max(r, rhs.r), std::max(g, rhs.g), std::max(b, rhs.b) };
+    }
+
+    /**
+     * @brief Clamps the components of this color to a specified range.
+     *
+     * @param[in] min The minimum value for each component.
+     * @param[in] max The maximum value for each component (inclusive).
+     * @return The clamped color.
+     */
+    constexpr Color clamp(f64 min, f64 max) const noexcept {
+        return {
+            std::clamp(r, min, max),
+            std::clamp(g, min, max),
+            std::clamp(b, min, max)
+        };
     }
 
     /**
@@ -146,7 +251,30 @@ struct Color {
         return a * (1.0 - t) + b * t;
     }
 
+    /**
+     * @brief Linearly interpolates between two colors (component-wise).
+     *
+     * @param[in] a The color at `t = 0.0`.
+     * @param[in] b The color at `t = 1.0`.
+     * @param[in] t The interpolation factor for each component in the range
+     *              `[0.0, 1.0]`.
+     * @return The interpolated color.
+     */
+    static constexpr Color lerp(
+        const Color& a,
+        const Color& b,
+        const Color& t
+    ) noexcept {
+        return a * (Color { 1.0, 1.0, 1.0 } - t) + b * t;
+    }
+
 };
+
+/** @brief The color black. */
+static constexpr Color BLACK = { 0.0, 0.0, 0.0 };
+
+/** @brief The color white. */
+static constexpr Color WHITE = { 1.0, 1.0, 1.0 };
 
 }
 
