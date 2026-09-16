@@ -140,7 +140,7 @@ static constexpr std::optional<Hit> intersect(
     const Ray& ray
 ) noexcept {
     std::optional<Hit> closestHit;
-    if (!intersect(mesh.bounds, ray)) {
+    if (mesh.bounds && !intersect(*mesh.bounds, ray)) {
         return closestHit;
     }
     for (const auto& [v0, v1, v2] : mesh.triangles()) {

@@ -2,6 +2,7 @@
 #define CGFS_MESH_HPP
 
 #include <cassert>
+#include <optional>
 #include <ranges>
 #include <vector>
 #include "cgfs/aabb.hpp"
@@ -34,35 +35,38 @@ struct Mesh {
     /** @brief The indices forming the triangles of this mesh. */
     std::vector<isize> indices;
 
-    /** @brief The axis-aligned bounding box of this mesh. */
-    Aabb bounds;
+    /** @brief An optional axis-aligned bounding box for this mesh. */
+    std::optional<Aabb> bounds;
 
     /** @brief The material of this mesh. */
     Material material;
 
     /**
-     * @brief Creates a new mesh with the specified vertices, indices,
-     * axis-aligned bounding box, and material.
+     * @brief Creates a new mesh with the specified vertices, indices, and
+     * material.
      *
      * @warning The behavior is undefined if `vertices` contains fewer than
      * three elements, or if `indices` is not a multiple of three.
      *
      * @param[in] vertices The vertices that make up the mesh.
      * @param[in] indices  The indices forming the triangles of the mesh.
-     * @param[in] bounds   The axis-aligned bounding box of the mesh.
      * @param[in] material The material of the mesh.
-     * @return A new mesh with the specified vertices, indices, axis-aligned
-     * bounding box, and material.
+     * @return A new mesh with the specified vertices, indices, and material.
      */
     static constexpr Mesh create(
         std::vector<Vec3<f64>> vertices,
         std::vector<isize> indices,
-        const Aabb& bounds,
         const Material& material
     ) noexcept {
         assert(vertices.size() >= 3);
         assert(indices.size() % 3 == 0);
-        return { std::move(vertices), std::move(indices), bounds, material };
+        Aabb bounds = Aabb::create(vertices);
+        return {
+            .vertices = std::move(vertices),
+            .indices = std::move(indices),
+            .bounds = bounds,
+            .material = material
+        };
     }
 
     /**
