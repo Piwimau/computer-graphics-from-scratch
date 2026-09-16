@@ -7,17 +7,6 @@
 
 namespace cgfs {
 
-/** @brief Represents an ambient light with a constant intensity. */
-struct AmbientLight {
-
-    /** @brief The color of this light. */
-    Color color;
-
-    /** @brief The intensity of this light. */
-    f64 intensity;
-
-};
-
 /** @brief Represents a point light radiating from a fixed position. */
 struct PointLight {
 
@@ -28,7 +17,7 @@ struct PointLight {
     f64 intensity;
 
     /** @brief The position of this light. */
-    Vec3<f64> pos;
+    Vec3<f64> position;
 
     /** @brief The constant attenuation factor of this light. */
     f64 kc;
@@ -51,10 +40,10 @@ struct SpotLight {
     f64 intensity;
 
     /** @brief The position of this light. */
-    Vec3<f64> pos;
+    Vec3<f64> position;
 
     /** @brief The direction this light points towards. */
-    Vec3<f64> dir;
+    Vec3<f64> direction;
 
     /** @brief The cosine of the inner cone angle. */
     f64 innerCutoff;
@@ -83,7 +72,7 @@ struct DirectionalLight {
     f64 intensity;
 
     /** @brief The direction of this light. */
-    Vec3<f64> dir;
+    Vec3<f64> direction;
 
 };
 

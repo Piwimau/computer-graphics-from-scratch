@@ -20,9 +20,6 @@ struct Scene {
     /** @brief The objects that make up this scene. */
     std::vector<Object> objects;
 
-    /** @brief The ambient light illuminating this scene. */
-    AmbientLight ambientLight;
-
     /** @brief The point lights illuminating this scene. */
     std::vector<PointLight> pointLights;
 

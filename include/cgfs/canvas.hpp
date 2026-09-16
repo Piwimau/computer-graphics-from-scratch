@@ -2,7 +2,9 @@
 #define CGFS_CANVAS_HPP
 
 #include <algorithm>
+#include <cassert>
 #include <memory>
+#include <span>
 #include "cgfs/types.hpp"
 
 namespace cgfs {
@@ -22,31 +24,101 @@ struct Pixel {
 };
 
 /** @brief Represents a canvas that can be drawn to. */
-struct Canvas {
+class Canvas final {
+private:
 
     /** @brief The pixels of this canvas. */
-    std::unique_ptr<Pixel[]> pixels;
+    std::unique_ptr<Pixel[]> _pixels;
 
     /** @brief The width of this canvas. */
-    isize width;
+    isize _width;
 
     /** @brief The height of this canvas. */
-    isize height;
+    isize _height;
+
+    /**
+     * @brief Initializes a new canvas with the specified pixels, width, and
+     * height.
+     *
+     * @warning The behavior is undefined if `pixels` is `nullptr`, or if
+     * `width` or `height` is negative.
+     *
+     * @param[in] pixels The pixels of the canvas.
+     * @param[in] width  The width of the canvas.
+     * @param[in] height The height of the canvas.
+     */
+    constexpr Canvas(
+        std::unique_ptr<Pixel[]> pixels,
+        isize width,
+        isize height
+    ) noexcept
+        : _pixels(std::move(pixels)), _width(width), _height(height) {
+        assert(_pixels != nullptr);
+        assert(_width >= 0);
+        assert(_height >= 0);
+    }
+
+public:
 
     /**
      * @brief Creates an empty canvas with a specified width and height.
      *
-     * @note The pixels of the canvas are initialized to zero (i.e., the are
-     * black by default).
+     * @note The pixels are zero-initialized (i.e., they are black by default).
+     *
+     * @warning The behavior is undefined if `width` or `height` is negative.
      *
      * @param[in] width  The width of the canvas.
      * @param[in] height The height of the canvas.
      * @return An empty canvas with the specified width and height.
      */
     static constexpr Canvas empty(isize width, isize height) {
+        assert(width >= 0);
+        assert(height >= 0);
         auto pixels = std::make_unique_for_overwrite<Pixel[]>(width * height);
         std::ranges::fill_n(pixels.get(), width * height, Pixel { 0, 0, 0 });
-        return { std::move(pixels), width, height };
+        return Canvas(std::move(pixels), width, height);
+    }
+
+    /**
+     * @brief Returns a span of the pixels of this canvas.
+     *
+     * @return A span of the pixels of this canvas.
+     */
+    constexpr std::span<const Pixel> pixels() const noexcept {
+        return std::span<const Pixel>(_pixels.get(), _width * _height);
+    }
+
+    /**
+     * @brief Returns the width of this canvas.
+     *
+     * @return The width of this canvas.
+     */
+    constexpr isize width() const noexcept {
+        return _width;
+    }
+
+    /**
+     * @brief Returns the height of this canvas.
+     *
+     * @return The height of this canvas.
+     */
+    constexpr isize height() const noexcept {
+        return _height;
+    }
+
+    /**
+     * @brief Sets a pixel at a specified position.
+     *
+     * @warning The behavior is undefined if `x` or `y` is out of bounds.
+     *
+     * @param[in] x     The x-coordinate of the pixel.
+     * @param[in] y     The y-coordinate of the pixel.
+     * @param[in] pixel The pixel to set.
+     */
+    constexpr void put_pixel(isize x, isize y, Pixel pixel) noexcept {
+        assert((x >= 0) && (x < _width));
+        assert((y >= 0) && (y < _height));
+        _pixels[y * _width + x] = pixel;
     }
 
 };

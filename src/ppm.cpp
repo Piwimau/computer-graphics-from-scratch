@@ -4,6 +4,7 @@
 #include <print>
 #include <stdexcept>
 #include "cgfs/ppm.hpp"
+#include "cgfs/types.hpp"
 #include "func-deleter.hpp"
 
 namespace cgfs {
@@ -19,15 +20,15 @@ void save_ppm(const Canvas& canvas, const std::string& path) {
         throw std::runtime_error(std::format("Failed to open '{}'.", path));
     }
     std::println(file.get(), "P6");
-    std::println(file.get(), "{} {}", canvas.width, canvas.height);
+    std::println(file.get(), "{} {}", canvas.width(), canvas.height());
     std::println(file.get(), "255");
     usize n = std::fwrite(
-        canvas.pixels.get(),
+        canvas.pixels().data(),
         sizeof(Pixel),
-        canvas.width * canvas.height,
+        canvas.pixels().size(),
         file.get()
     );
-    if (static_cast<isize>(n) != canvas.width * canvas.height) {
+    if (n != canvas.pixels().size()) {
         throw std::runtime_error(std::format("Failed to write to '{}'.", path));
     }
 }
