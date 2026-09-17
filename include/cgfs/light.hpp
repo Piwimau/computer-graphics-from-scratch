@@ -19,6 +19,9 @@ struct PointLight {
     /** @brief The position of this light. */
     Vec3<f64> position;
 
+    /** @brief The radius of this light. */
+    f64 radius;
+
     /** @brief The constant attenuation factor of this light. */
     f64 kc;
 
@@ -44,6 +47,9 @@ struct SpotLight {
 
     /** @brief The direction this light points towards. */
     Vec3<f64> direction;
+
+    /** @brief The radius of this light. */
+    f64 radius;
 
     /** @brief The cosine of the inner cone angle. */
     f64 innerCutoff;
@@ -73,6 +79,9 @@ struct DirectionalLight {
 
     /** @brief The direction of this light. */
     Vec3<f64> direction;
+
+    /** @brief The radius of this light. */
+    f64 radius;
 
 };
 

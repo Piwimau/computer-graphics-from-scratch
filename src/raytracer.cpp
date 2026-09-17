@@ -5,8 +5,10 @@
 #include <limits>
 #include <numbers>
 #include <optional>
+#include <random>
 #include <ranges>
 #include <thread>
+#include <utility>
 #include "cgfs/raytracer.hpp"
 #include "cgfs/vec2.hpp"
 
@@ -261,6 +263,38 @@ static constexpr bool intersect_any(
 }
 
 /**
+ * @brief Computes an orthonormal basis around a normal.
+ *
+ * @param[in] normal A normal around which to compute the basis (normalized).
+ * @return A pair containing the tangent and bitangent forming an orthonormal
+ * basis with the normal.
+ */
+static constexpr std::pair<Vec3<f64>, Vec3<f64>> orthonormal_basis(
+    const Vec3<f64>& normal
+) noexcept {
+    f64 sign = std::copysign(1.0, normal.z);
+    f64 a = -1.0 / (sign + normal.z);
+    f64 b = normal.x * normal.y * a;
+    return {
+        { 1.0 + sign * normal.x * normal.x * a, sign * b, -sign * normal.x },
+        { b, sign + normal.y * normal.y * a, -normal.y }
+    };
+}
+
+/**
+ * @brief Uniformly samples a point on a unit disk.
+ *
+ * @param[in, out] rng The random engine to draw from.
+ * @return A point on the unit disk.
+ */
+static Vec2<f64> sample_disk(std::mt19937& rng) noexcept {
+    std::uniform_real_distribution<f64> dist(-1.0, 1.0);
+    f64 r = std::sqrt(dist(rng) * 0.5 + 0.5);
+    f64 theta = (dist(rng) * 0.5 + 0.5) * 2.0 * PI;
+    return { r * std::cos(theta), r * std::sin(theta) };
+}
+
+/**
  * @brief Computes the Fresnel reflectance using the Schlick approximation.
  *
  * @param[in] cosTheta The cosine of the angle between the view/light direction
@@ -278,20 +312,22 @@ static constexpr Color fresnel_schlick(f64 cosTheta, const Color& f0) noexcept {
  * @brief Computes the local color at a point on a surface, accounting for the
  * material properties, lights, and other objects in the scene.
  *
- * @param[in] point    The point to compute the local color for.
- * @param[in] normal   The surface normal at that point (normalized).
- * @param[in] viewDir  The direction from the point towards the camera
- *                     (normalized).
- * @param[in] material The material of the surface at the point.
- * @param[in] scene    The scene containing objects and lights.
+ * @param[in]      point    The point to compute the local color for.
+ * @param[in]      normal   The surface normal at that point (normalized).
+ * @param[in]      viewDir  The direction from the point towards the camera
+ *                          (normalized).
+ * @param[in]      material The material of the surface at the point.
+ * @param[in]      scene    The scene containing objects and lights.
+ * @param[in, out] rng      The random engine to draw from.
  * @return The local color at the point.
  */
-static constexpr Color local_color(
+static Color local_color(
     const Vec3<f64>& point,
     const Vec3<f64>& normal,
     const Vec3<f64>& viewDir,
     const Material& material,
-    const Scene& scene
+    const Scene& scene,
+    std::mt19937& rng
 ) noexcept {
     auto is_blocked = [&](const Vec3<f64>& lightDir, f64 tMax) -> bool {
         return intersect_any(
@@ -327,7 +363,14 @@ static constexpr Color local_color(
     };
     Color local = BLACK;
     for (const PointLight& light : scene.pointLights) {
-        Vec3<f64> lightDir = light.position - point;
+        Vec3<f64> lightPos = light.position;
+        if (light.radius > 0.0) {
+            Vec3<f64> approxDir = (lightPos - point).normalize();
+            auto [tangent, bitangent] = orthonormal_basis(approxDir);
+            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            lightPos += tangent * sample.x + bitangent * sample.y;
+        }
+        Vec3<f64> lightDir = lightPos - point;
         f64 distance = lightDir.norm();
         lightDir = lightDir.normalize();
         if (!is_blocked(lightDir, distance)) {
@@ -339,7 +382,14 @@ static constexpr Color local_color(
         }
     }
     for (const SpotLight& light : scene.spotLights) {
-        Vec3<f64> lightDir = light.position - point;
+        Vec3<f64> lightPos = light.position;
+        if (light.radius > 0.0) {
+            Vec3<f64> approxDir = (lightPos - point).normalize();
+            auto [tangent, bitangent] = orthonormal_basis(approxDir);
+            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            lightPos += tangent * sample.x + bitangent * sample.y;
+        }
+        Vec3<f64> lightDir = lightPos - point;
         f64 distance = lightDir.norm();
         lightDir = lightDir.normalize();
         if (!is_blocked(lightDir, distance)) {
@@ -362,6 +412,12 @@ static constexpr Color local_color(
     }
     for (const DirectionalLight& light : scene.directionalLights) {
         Vec3<f64> lightDir = (-light.direction).normalize();
+        if (light.radius > 0.0) {
+            auto [tangent, bitangent] = orthonormal_basis(lightDir);
+            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            lightDir = (lightDir + tangent * sample.x + bitangent * sample.y)
+                .normalize();
+        }
         if (!is_blocked(lightDir, INF)) {
             local += lighting(lightDir) * light.color * light.intensity;
         }
@@ -373,15 +429,17 @@ static constexpr Color local_color(
  * @brief Traces a ray through a scene and returns the surface color of the
  * closest object it intersects with.
  *
- * @param[in] scene The scene containing objects and lights.
- * @param[in] ray   The ray to trace.
- * @param[in] depth The maximum recursion depth.
+ * @param[in]      scene The scene containing objects and lights.
+ * @param[in]      ray   The ray to trace.
+ * @param[in, out] rng   The random engine to draw from.
+ * @param[in]      depth The maximum recursion depth.
  * @return The surface color of the closest object the ray intersects with, or
  * `BACKGROUND_COLOR` if no intersection is found.
  */
 static constexpr Color trace_ray(
     const Scene& scene,
     const Ray& ray,
+    std::mt19937& rng,
     isize depth = 3
 ) noexcept {
     assert(depth >= 0);
@@ -392,7 +450,7 @@ static constexpr Color trace_ray(
     }
     const auto& [_, point, normal, material] = *hit;
     Vec3<f64> viewDir = (-ray.direction).normalize();
-    Color local = local_color(point, normal, viewDir, material, scene);
+    Color local = local_color(point, normal, viewDir, material, scene, rng);
     if (depth == 0) {
         result = local;
         return result;
@@ -404,14 +462,27 @@ static constexpr Color trace_ray(
         result = local;
         return result;
     }
+    Vec3<f64> reflectDir = viewDir.reflect(normal);
+    if (material.roughness > 0.0) {
+        auto [tangent, bitangent] = orthonormal_basis(reflectDir);
+        f64 alpha = std::max(material.roughness * material.roughness, EPS);
+        Vec2<f64> sample = sample_disk(rng) * alpha;
+        reflectDir = (reflectDir + tangent * sample.x + bitangent * sample.y)
+            .normalize();
+    }
+    if (reflectDir.dot(normal) <= 0.0) {
+        result = local;
+        return result;
+    }
     Color reflected = trace_ray(
         scene,
         {
             .origin = point,
-            .direction = viewDir.reflect(normal),
+            .direction = reflectDir,
             .tMin = DISTANCE_OFFSET,
             .tMax = INF
         },
+        rng,
         depth - 1
     );
     result = Color::lerp(local, reflected, reflectance);
@@ -444,6 +515,8 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
     };
     std::atomic<isize> nextY = 0;
     auto render_row = [&]() -> void {
+        std::random_device device;
+        std::mt19937 rng(device());
         isize y;
         while (
             (y = nextY.fetch_add(1, std::memory_order::relaxed))
@@ -471,7 +544,7 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
                             .tMin = scene.viewport.distance,
                             .tMax = INF
                         };
-                        sum += trace_ray(scene, ray);
+                        sum += trace_ray(scene, ray, rng);
                     }
                 }
                 Color avg = sum / static_cast<f64>(samples * samples);
