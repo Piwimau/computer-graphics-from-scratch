@@ -1,10 +1,12 @@
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <cmath>
 #include <limits>
 #include <numbers>
 #include <optional>
 #include <ranges>
+#include <thread>
 #include "cgfs/raytracer.hpp"
 #include "cgfs/vec2.hpp"
 
@@ -61,6 +63,12 @@ static constexpr f64 DISTANCE_OFFSET = 1.0E-03;
 
 /** @brief The factor used for gamma correction. */
 static constexpr f64 GAMMA = 2.2;
+
+/** @brief The maximum number of threads to use for rendering. */
+static const usize MAX_THREADS = std::max<usize>(
+    std::thread::hardware_concurrency(),
+    1
+);
 
 /**
  * @brief Tries to intersect a ray with a sphere.
@@ -413,41 +421,53 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
         .x = scene.viewport.width / canvasSize.x,
         .y = scene.viewport.height / canvasSize.y
     };
-    for (isize y = 0; y < canvas.height(); y++) {
-        for (isize x = 0; x < canvas.width(); x++) {
-            Color avg = { };
-            for (isize sy = 0; sy < samples; sy++) {
-                for (isize sx = 0; sx < samples; sx++) {
-                    Vec3<f64> viewportPos = {
-                        .x = (-canvasSize.x / 2.0 + static_cast<f64>(x)
-                              + (static_cast<f64>(sx) + 0.5)
-                                  / static_cast<f64>(samples))
-                            * viewportScale.x,
-                        .y = (canvasSize.y / 2.0 - 1.0 - static_cast<f64>(y)
-                              - (static_cast<f64>(sy) + 0.5)
-                                  / static_cast<f64>(samples))
-                            * viewportScale.y,
-                        .z = -scene.viewport.distance
-                    };
-                    Ray ray = {
-                        .origin = scene.camera.viewpoint,
-                        .direction = (scene.camera.rotation * viewportPos)
-                            .normalize(),
-                        .tMin = scene.viewport.distance,
-                        .tMax = INF
-                    };
-                    avg += trace_ray(scene, ray)
-                        / static_cast<f64>(samples * samples);
+    std::atomic<isize> nextY = 0;
+    auto render_row = [&]() -> void {
+        isize y;
+        while (
+            (y = nextY.fetch_add(1, std::memory_order::relaxed))
+                < canvas.height()
+        ) {
+            for (isize x = 0; x < canvas.width(); x++) {
+                Color sum = { };
+                for (isize sy = 0; sy < samples; sy++) {
+                    for (isize sx = 0; sx < samples; sx++) {
+                        Vec3<f64> viewportPos = {
+                            .x = (-canvasSize.x / 2.0 + static_cast<f64>(x)
+                                + (static_cast<f64>(sx) + 0.5)
+                                    / static_cast<f64>(samples))
+                                * viewportScale.x,
+                            .y = (canvasSize.y / 2.0 - 1.0 - static_cast<f64>(y)
+                                - (static_cast<f64>(sy) + 0.5)
+                                    / static_cast<f64>(samples))
+                                * viewportScale.y,
+                            .z = -scene.viewport.distance
+                        };
+                        Ray ray = {
+                            .origin = scene.camera.viewpoint,
+                            .direction = (scene.camera.rotation * viewportPos)
+                                .normalize(),
+                            .tMin = scene.viewport.distance,
+                            .tMax = INF
+                        };
+                        sum += trace_ray(scene, ray);
+                    }
                 }
+                Color avg = sum / static_cast<f64>(samples * samples);
+                Color color = gamma_correct(avg).clamp(0.0, 1.0);
+                Pixel pixel = {
+                    .r = static_cast<u8>(color.r * 255.0 + 0.5),
+                    .g = static_cast<u8>(color.g * 255.0 + 0.5),
+                    .b = static_cast<u8>(color.b * 255.0 + 0.5)
+                };
+                canvas.put_pixel(x, y, pixel);
             }
-            Color color = gamma_correct(avg).clamp(0.0, 1.0);
-            Pixel pixel = {
-                .r = static_cast<u8>(color.r * 255.0 + 0.5),
-                .g = static_cast<u8>(color.g * 255.0 + 0.5),
-                .b = static_cast<u8>(color.b * 255.0 + 0.5)
-            };
-            canvas.put_pixel(x, y, pixel);
         }
+    };
+    std::vector<std::jthread> threads;
+    threads.reserve(MAX_THREADS);
+    for (usize i = 0; i < MAX_THREADS; i++) {
+        threads.emplace_back(render_row);
     }
 }
 
