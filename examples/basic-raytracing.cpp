@@ -10,7 +10,7 @@ int main() {
             cgfs::Sphere {
                 .center = { -2.0, 0.0, -4.0 },
                 .radius = 1.0,
-                .material = cgfs::Material::create(
+                .material = cgfs::Material::opaque(
                     { 0.0, 1.0, 0.0 },
                     0.25,
                     0.25
@@ -19,7 +19,7 @@ int main() {
             cgfs::Sphere {
                 .center = { 0.0, -1.0, -3.0 },
                 .radius = 1.0,
-                .material = cgfs::Material::create(
+                .material = cgfs::Material::opaque(
                     { 1.0, 0.0, 0.0 },
                     0.1,
                     0.75
@@ -28,7 +28,7 @@ int main() {
             cgfs::Sphere {
                 .center = { 2.0, 0.0, -4.0 },
                 .radius = 1.0,
-                .material = cgfs::Material::create(
+                .material = cgfs::Material::opaque(
                     { 0.0, 0.0, 1.0 },
                     0.35,
                     0.25
@@ -37,7 +37,7 @@ int main() {
             cgfs::Sphere {
                 .center = { 0.0, -5001.0, 0.0 },
                 .radius = 5000.0,
-                .material = cgfs::Material::create(
+                .material = cgfs::Material::opaque(
                     { 1.0, 1.0, 0.0 },
                     0.25,
                     0.25

@@ -31,7 +31,7 @@ int main() {
                 0, 2, 3
             },
             .bounds = std::nullopt,
-            .material = cgfs::Material::create({ 0.6, 0.6, 0.6 }, 0.0, 0.6)
+            .material = cgfs::Material::opaque({ 0.6, 0.6, 0.6 }, 0.0, 0.6)
         }
     };
     for (cgfs::isize row = 0; row < GRID_SIZE; row++) {
@@ -50,7 +50,7 @@ int main() {
                             / 2.0) * GRID_SPACING
                     },
                     .radius = SPHERE_RADIUS,
-                    .material = cgfs::Material::create(
+                    .material = cgfs::Material::opaque(
                         { 0.9, 0.65, 0.2 },
                         metalness,
                         roughness

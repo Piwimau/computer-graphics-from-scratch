@@ -270,12 +270,6 @@ struct Color {
 
 };
 
-/** @brief The color black. */
-static constexpr Color BLACK = { 0.0, 0.0, 0.0 };
-
-/** @brief The color white. */
-static constexpr Color WHITE = { 1.0, 1.0, 1.0 };
-
 }
 
 #endif
