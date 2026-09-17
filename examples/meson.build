@@ -1,5 +1,6 @@
 examples = {
     'basic-raytracing': 'basic-raytracing.cpp',
+    'metalness-roughness': 'metalness-roughness.cpp'
 }
 
 cpp = meson.get_compiler('cpp')
