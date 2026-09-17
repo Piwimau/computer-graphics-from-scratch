@@ -47,7 +47,7 @@ int main() {
         .pointLights = {
             {
                 .color = { 1.0, 1.0, 1.0 },
-                .intensity = 0.6,
+                .intensity = 1.0,
                 .position = { 2.0, 1.0, 0.0 },
                 .kc = 1.0,
                 .kl = 0.09,
@@ -58,7 +58,7 @@ int main() {
         .directionalLights = {
             {
                 .color = { 1.0, 1.0, 1.0 },
-                .intensity = 0.3,
+                .intensity = 1.0,
                 .direction = { -4.0, -1.0, -1.0 }
             }
         },

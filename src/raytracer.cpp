@@ -51,19 +51,13 @@ static constexpr f64 PI = std::numbers::pi_v<f64>;
 static constexpr f64 INF = std::numeric_limits<f64>::infinity();
 
 /** @brief The epsilon for floating-point calculations. */
-static constexpr f64 EPS = std::numeric_limits<f64>::epsilon();
+static constexpr f64 EPS = 1.0E-6;
 
 /** @brief The background color used when no objects are intersected. */
 static constexpr Color BACKGROUND_COLOR = BLACK;
 
 /** @brief A small offset used to avoid self-intersections. */
-static constexpr f64 DISTANCE_OFFSET = 0.001;
-
-/** @brief The minimum roughness to avoid artifacts. */
-static constexpr f64 MIN_ROUGHNESS = 0.001;
-
-/** @brief The falloff coefficient for reflections. */
-static constexpr f64 REFLECTION_FALLOFF = 2.0;
+static constexpr f64 DISTANCE_OFFSET = 1.0E-03;
 
 /** @brief The factor used for gamma correction. */
 static constexpr f64 GAMMA = 2.2;
@@ -238,15 +232,16 @@ static constexpr bool any_intersection(
 }
 
 /**
- * @brief Computes the Fresnel effect using the Schlick approximation.
+ * @brief Computes the Fresnel reflectance using the Schlick approximation.
  *
- * @param[in] cosTheta The cosine of the angle between the view direction and
- *                     the surface normal.
- * @param[in] f0       The reflectance color at normal incidence.
- * @return The Fresnel reflectance color.
+ * @param[in] cosTheta The cosine of the angle between the view/light direction
+ *                     and the half-vector (or normal).
+ * @param[in] f0       The reflectance at normal incidence.
+ * @return The Fresnel reflectance.
  */
-static constexpr Color fresnel_schlick(f64 cosTheta, Color f0) noexcept {
-    f64 t = std::pow(1.0 - std::clamp(cosTheta, 0.0, 1.0), 5.0);
+static constexpr Color fresnel_schlick(f64 cosTheta, const Color& f0) noexcept {
+    f64 x = 1.0 - std::clamp(cosTheta, 0.0, 1.0);
+    f64 t = x * x * x * x * x;
     return Color::lerp(f0, WHITE, t);
 }
 
@@ -280,20 +275,26 @@ static constexpr Color local_color(
             }
         );
     };
+    f64 alpha = std::max(material.roughness * material.roughness, EPS);
+    f64 alpha2 = alpha * alpha;
+    f64 nDotV = std::max(normal.dot(viewDir), 0.0);
+    f64 k = (material.roughness + 1.0) * (material.roughness + 1.0) / 8.0;
+    f64 geometryV = nDotV / (nDotV * (1.0 - k) + k);
     auto lighting = [&](const Vec3<f64>& lightDir) -> Color {
-        Vec3<f64> halfDir = (lightDir + viewDir).normalize();
-        f64 vh = std::max(viewDir.dot(halfDir), 0.0);
-        Color fresnel = fresnel_schlick(vh, material.f0);
-        Color kd = (WHITE - fresnel) * (1.0 - material.metalness);
-        f64 nl = std::max(normal.dot(lightDir), 0.0);
-        Color diffuse = kd * material.albedo * nl;
-        f64 shininess = 2.0
-                / std::pow(std::max(material.roughness, MIN_ROUGHNESS), 4)
-            - 2.0;
-        f64 norm = (shininess + 8.0) / (8.0 * PI);
-        f64 nh = std::max(normal.dot(halfDir), 0.0);
-        Color specular = fresnel * norm * std::pow(nh, shininess);
-        return diffuse + specular;
+        Vec3<f64> halfDir = (viewDir + lightDir).normalize();
+        f64 vDotH = std::max(viewDir.dot(halfDir), 0.0);
+        Color fresnel = fresnel_schlick(vDotH, material.f0);
+        Color diffuse = material.albedo / PI * (WHITE - fresnel)
+            * (1.0 - material.metalness);
+        f64 nDotH = std::max(normal.dot(halfDir), 0.0);
+        f64 denom = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
+        f64 distribution = alpha2 / (PI * denom * denom);
+        f64 nDotL = std::max(normal.dot(lightDir), 0.0);
+        f64 geometryL = nDotL / (nDotL * (1.0 - k) + k);
+        f64 geometry = geometryV * geometryL;
+        Color specular = fresnel
+            * (distribution * geometry / std::max(4.0 * nDotV * nDotL, EPS));
+        return (diffuse + specular) * nDotL;
     };
     Color local = BLACK;
     for (const PointLight& light : scene.pointLights) {
@@ -363,19 +364,28 @@ static constexpr Color trace_ray(
     const auto& [_, point, normal, material] = *hit;
     Vec3<f64> viewDir = (-ray.direction).normalize();
     Color local = local_color(point, normal, viewDir, material, scene);
-    if (depth > 0) {
-        f64 nv = std::max(normal.dot(viewDir), 0.0);
-        Color reflectivity = fresnel_schlick(nv, material.f0)
-            * std::pow(1.0 - material.roughness, REFLECTION_FALLOFF);
-        Ray reflectedRay = {
+    if (depth == 0) {
+        result = local;
+        return result;
+    }
+    f64 nDotV = std::max(normal.dot(viewDir), 0.0);
+    f64 r = 1.0 - material.roughness;
+    Color reflectance = fresnel_schlick(nDotV, material.f0) * r * r;
+    if (reflectance.max() < EPS) {
+        result = local;
+        return result;
+    }
+    Color reflected = trace_ray(
+        scene,
+        {
             .origin = point,
             .direction = viewDir.reflect(normal),
             .tMin = DISTANCE_OFFSET,
             .tMax = INF
-        };
-        Color reflected = trace_ray(scene, reflectedRay, depth - 1);
-        result = Color::lerp(local, reflected, reflectivity);
-    }
+        },
+        depth - 1
+    );
+    result = Color::lerp(local, reflected, reflectance);
     return result;
 }
 
