@@ -46,6 +46,16 @@ struct Hit {
 
 };
 
+/** @brief Represents a helper to allow overloading of lambdas. */
+template<typename... Ts>
+struct Overloaded : Ts... {
+    using Ts::operator()...;
+};
+
+/** @brief A deduction guide for the overload helper. */
+template<typename... Ts>
+Overloaded(Ts...) -> Overloaded<Ts...>;
+
 /** @brief The value of pi. */
 static constexpr f64 PI = std::numbers::pi_v<f64>;
 
@@ -77,7 +87,7 @@ static const usize MAX_THREADS = std::max<usize>(
  * @param[in] ray    The ray to test for intersection.
  * @return An hit on success, otherwise `std::nullopt`.
  */
-static constexpr std::optional<Hit> intersect(
+static constexpr std::optional<Hit> intersect_sphere(
     const Sphere& sphere,
     const Ray& ray
 ) noexcept {
@@ -111,7 +121,10 @@ static constexpr std::optional<Hit> intersect(
  * @param[in] ray    The ray to test for intersection.
  * @return `true` if an intersection is found, otherwise `false`.
  */
-static constexpr bool intersect(const Aabb& bounds, const Ray& ray) noexcept {
+static constexpr bool intersect_aabb(
+    const Aabb& bounds,
+    const Ray& ray
+) noexcept {
     f64 tMin = ray.tMin;
     f64 tMax = ray.tMax;
     auto slab = [&](f64 min, f64 max, f64 origin, f64 dir) -> bool {
@@ -137,12 +150,12 @@ static constexpr bool intersect(const Aabb& bounds, const Ray& ray) noexcept {
  * @param[in] ray  The ray to test for intersection.
  * @return A hit on success, otherwise `std::nullopt`.
  */
-static constexpr std::optional<Hit> intersect(
+static constexpr std::optional<Hit> intersect_mesh(
     const Mesh& mesh,
     const Ray& ray
 ) noexcept {
     std::optional<Hit> closestHit;
-    if (mesh.bounds && !intersect(*mesh.bounds, ray)) {
+    if (mesh.bounds && !intersect_aabb(*mesh.bounds, ray)) {
         return closestHit;
     }
     for (const auto& [v0, v1, v2] : mesh.triangles()) {
@@ -193,23 +206,26 @@ static constexpr std::optional<Hit> closest_intersection(
 ) noexcept {
     std::optional<Hit> closestHit;
     for (const Object& object : objects) {
-        std::visit(
-            [&]<typename T>(const T& o) {
-                std::optional<Hit> hit = intersect(
-                    o,
-                    {
-                        .origin = ray.origin,
-                        .direction = ray.direction,
-                        .tMin = ray.tMin,
-                        .tMax = closestHit ? closestHit->t : ray.tMax
-                    }
-                );
-                if (hit && (!closestHit || (hit->t < closestHit->t))) {
-                    closestHit = hit;
+        Ray updatedRay = {
+            .origin = ray.origin,
+            .direction = ray.direction,
+            .tMin = ray.tMin,
+            .tMax = closestHit ? closestHit->t : ray.tMax
+        };
+        std::optional<Hit> hit = std::visit(
+            Overloaded {
+                [&](const Sphere& sphere) {
+                    return intersect_sphere(sphere, updatedRay);
+                },
+                [&](const Mesh& mesh) {
+                    return intersect_mesh(mesh, updatedRay);
                 }
             },
             object
         );
+        if (hit && (!closestHit || (hit->t < closestHit->t))) {
+            closestHit = hit;
+        }
     }
     return closestHit;
 }
@@ -221,14 +237,19 @@ static constexpr std::optional<Hit> closest_intersection(
  * @param[in] ray     The ray to test for intersections.
  * @return `true` if the ray intersects any object, otherwise `false`.
  */
-static constexpr bool any_intersection(
+static constexpr bool intersect_any(
     std::span<const Object> objects,
     const Ray& ray
 ) noexcept {
     for (const Object& object : objects) {
-        bool hit = std::visit(
-            [&]<typename T>(const T& o) {
-                return intersect(o, ray) != std::nullopt;
+        std::optional<Hit> hit = std::visit(
+            Overloaded {
+                [&](const Sphere& sphere) {
+                    return intersect_sphere(sphere, ray);
+                },
+                [&](const Mesh& mesh) {
+                    return intersect_mesh(mesh, ray);
+                }
             },
             object
         );
@@ -273,7 +294,7 @@ static constexpr Color local_color(
     const Scene& scene
 ) noexcept {
     auto is_blocked = [&](const Vec3<f64>& lightDir, f64 tMax) -> bool {
-        return any_intersection(
+        return intersect_any(
             scene.objects,
             {
                 .origin = point,
