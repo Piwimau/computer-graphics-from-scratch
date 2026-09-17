@@ -11,10 +11,10 @@ namespace cgfs {
 struct Camera {
 
     /** @brief The viewpoint of this camera. */
-    Vec3<f64> viewpoint;
+    Vec3<f32> viewpoint;
 
     /** @brief The rotation of this camera. */
-    Mat3<f64> rotation;
+    Mat3<f32> rotation;
 
     /**
      * @brief Creates a camera looking in a certain direction from a specified
@@ -32,14 +32,14 @@ struct Camera {
      * @return A camera looking in the direction from the specified viewpoint.
      */
     static constexpr Camera look(
-        const Vec3<f64>& viewpoint,
-        const Vec3<f64>& direction,
-        const Vec3<f64>& up = { 0.0, 1.0, 0.0 }
+        const Vec3<f32>& viewpoint,
+        const Vec3<f32>& direction,
+        const Vec3<f32>& up = { 0.0F, 1.0F, 0.0F }
     ) noexcept {
-        Vec3<f64> z = (-direction).normalize();
-        Vec3<f64> x = up.cross(z).normalize();
-        Vec3<f64> y = z.cross(x);
-        Mat3<f64> rotation = {
+        Vec3<f32> z = (-direction).normalize();
+        Vec3<f32> x = up.cross(z).normalize();
+        Vec3<f32> y = z.cross(x);
+        Mat3<f32> rotation = {
             x.x, y.x, z.x,
             x.y, y.y, z.y,
             x.z, y.z, z.z
@@ -62,11 +62,11 @@ struct Camera {
      * @return A camera looking at the target from the specified viewpoint.
      */
     static constexpr Camera look_at(
-        const Vec3<f64>& viewpoint,
-        const Vec3<f64>& target,
-        const Vec3<f64>& up = { 0.0, 1.0, 0.0 }
+        const Vec3<f32>& viewpoint,
+        const Vec3<f32>& target,
+        const Vec3<f32>& up = { 0.0F, 1.0F, 0.0F }
     ) noexcept {
-        Vec3<f64> direction = (target - viewpoint).normalize();
+        Vec3<f32> direction = (target - viewpoint).normalize();
         return look(viewpoint, direction, up);
     }
 

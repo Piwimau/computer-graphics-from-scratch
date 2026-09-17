@@ -11,10 +11,10 @@ namespace cgfs {
 struct Sphere {
 
     /** @brief The center of this sphere. */
-    Vec3<f64> center;
+    Vec3<f32> center;
 
     /** @brief The radius of this sphere. */
-    f64 radius;
+    f32 radius;
 
     /** @brief The material of this sphere. */
     Material material;

@@ -10,13 +10,13 @@ namespace cgfs {
 struct Color {
 
     /** @brief The red component of this color. */
-    f64 r;
+    f32 r;
 
     /** @brief The green component of this color. */
-    f64 g;
+    f32 g;
 
     /** @brief The blue component of this color. */
-    f64 b;
+    f32 b;
 
     /**
      * @brief Adds a color to this color (component-wise).
@@ -74,7 +74,7 @@ struct Color {
      * @param[in] rhs The scalar to multiply by.
      * @return A reference to this color after multiplication.
      */
-    constexpr Color& operator*=(f64 rhs) noexcept {
+    constexpr Color& operator*=(f32 rhs) noexcept {
         r = r * rhs;
         g = g * rhs;
         b = b * rhs;
@@ -88,7 +88,7 @@ struct Color {
      * @param[in] rhs The scalar to multiply by.
      * @return The result of multiplying the color by the scalar.
      */
-    friend constexpr Color operator*(Color lhs, f64 rhs) noexcept {
+    friend constexpr Color operator*(Color lhs, f32 rhs) noexcept {
         lhs *= rhs;
         return lhs;
     }
@@ -100,7 +100,7 @@ struct Color {
      * @param[in] rhs The color to scale.
      * @return The result of multiplying the color by the scalar.
      */
-    friend constexpr Color operator*(f64 lhs, Color rhs) noexcept {
+    friend constexpr Color operator*(f32 lhs, Color rhs) noexcept {
         rhs *= lhs;
         return rhs;
     }
@@ -136,7 +136,7 @@ struct Color {
      * @param[in] rhs The scalar to divide by.
      * @return A reference to this color after division.
      */
-    constexpr Color& operator/=(f64 rhs) noexcept {
+    constexpr Color& operator/=(f32 rhs) noexcept {
         r = r / rhs;
         g = g / rhs;
         b = b / rhs;
@@ -150,7 +150,7 @@ struct Color {
      * @param[in] rhs The scalar to divide by.
      * @return The result of dividing the color by the scalar.
      */
-    friend constexpr Color operator/(Color lhs, f64 rhs) noexcept {
+    friend constexpr Color operator/(Color lhs, f32 rhs) noexcept {
         lhs /= rhs;
         return lhs;
     }
@@ -185,7 +185,7 @@ struct Color {
      *
      * @return The minimum component of this color.
      */
-    constexpr f64 min() const noexcept {
+    constexpr f32 min() const noexcept {
         return std::min({ r, g, b });
     }
 
@@ -197,7 +197,11 @@ struct Color {
      * @return The component-wise minimum of this color and another color.
      */
     constexpr Color min(const Color& rhs) const noexcept {
-        return { std::min(r, rhs.r), std::min(g, rhs.g), std::min(b, rhs.b) };
+        return {
+            std::min(r, rhs.r),
+            std::min(g, rhs.g),
+            std::min(b, rhs.b)
+        };
     }
 
     /**
@@ -205,7 +209,7 @@ struct Color {
      *
      * @return The maximum component of this color.
      */
-    constexpr f64 max() const noexcept {
+    constexpr f32 max() const noexcept {
         return std::max({ r, g, b });
     }
 
@@ -217,7 +221,11 @@ struct Color {
      * @return The component-wise maximum of this color and another color.
      */
     constexpr Color max(const Color& rhs) const noexcept {
-        return { std::max(r, rhs.r), std::max(g, rhs.g), std::max(b, rhs.b) };
+        return {
+            std::max(r, rhs.r),
+            std::max(g, rhs.g),
+            std::max(b, rhs.b)
+        };
     }
 
     /**
@@ -227,7 +235,7 @@ struct Color {
      * @param[in] max The maximum value for each component (inclusive).
      * @return The clamped color.
      */
-    constexpr Color clamp(f64 min, f64 max) const noexcept {
+    constexpr Color clamp(f32 min, f32 max) const noexcept {
         return {
             std::clamp(r, min, max),
             std::clamp(g, min, max),
@@ -238,26 +246,26 @@ struct Color {
     /**
      * @brief Linearly interpolates between two colors.
      *
-     * @param[in] a The color at `t = 0.0`.
-     * @param[in] b The color at `t = 1.0`.
-     * @param[in] t The interpolation factor in the range `[0.0, 1.0]`.
+     * @param[in] a The color at `t = 0.0F`.
+     * @param[in] b The color at `t = 1.0F`.
+     * @param[in] t The interpolation factor in the range `[0.0F, 1.0F]`.
      * @return The interpolated color.
      */
     static constexpr Color lerp(
         const Color& a,
         const Color& b,
-        f64 t
+        f32 t
     ) noexcept {
-        return a * (1.0 - t) + b * t;
+        return a * (1.0F - t) + b * t;
     }
 
     /**
      * @brief Linearly interpolates between two colors (component-wise).
      *
-     * @param[in] a The color at `t = 0.0`.
-     * @param[in] b The color at `t = 1.0`.
+     * @param[in] a The color at `t = 0.0F`.
+     * @param[in] b The color at `t = 1.0F`.
      * @param[in] t The interpolation factor for each component in the range
-     *              `[0.0, 1.0]`.
+     *              `[0.0F, 1.0F]`.
      * @return The interpolated color.
      */
     static constexpr Color lerp(
@@ -265,7 +273,7 @@ struct Color {
         const Color& b,
         const Color& t
     ) noexcept {
-        return a * (Color { 1.0, 1.0, 1.0 } - t) + b * t;
+        return a * (Color { 1.0F, 1.0F, 1.0F } - t) + b * t;
     }
 
 };

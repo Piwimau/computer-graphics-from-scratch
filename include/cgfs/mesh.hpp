@@ -16,13 +16,22 @@ namespace cgfs {
 struct Triangle {
 
     /** @brief The first vertex of this triangle. */
-    Vec3<f64> v0;
+    Vec3<f32> v0;
 
     /** @brief The second vertex of this triangle. */
-    Vec3<f64> v1;
+    Vec3<f32> v1;
 
     /** @brief The third vertex of this triangle. */
-    Vec3<f64> v2;
+    Vec3<f32> v2;
+
+    /**
+     * @brief Returns the normalized surface normal of this triangle.
+     *
+     * @return The normalized surface normal of this triangle.
+     */
+    constexpr Vec3<f32> normal() const noexcept {
+        return (v1 - v0).cross(v2 - v0).normalize();
+    }
 
 };
 
@@ -30,7 +39,7 @@ struct Triangle {
 struct Mesh {
 
     /** @brief The vertices that make up this mesh. */
-    std::vector<Vec3<f64>> vertices;
+    std::vector<Vec3<f32>> vertices;
 
     /** @brief The indices forming the triangles of this mesh. */
     std::vector<isize> indices;
@@ -54,7 +63,7 @@ struct Mesh {
      * @return A new mesh with the specified vertices, indices, and material.
      */
     static constexpr Mesh create(
-        std::vector<Vec3<f64>> vertices,
+        std::vector<Vec3<f32>> vertices,
         std::vector<isize> indices,
         const Material& material
     ) noexcept {

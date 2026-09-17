@@ -11,13 +11,13 @@ namespace cgfs {
 struct Viewport {
 
     /** @brief The width of this viewport. */
-    f64 width;
+    f32 width;
 
     /** @brief The height of this viewport. */
-    f64 height;
+    f32 height;
 
     /** @brief The distance to the camera. */
-    f64 distance;
+    f32 distance;
 
     /**
      * @brief Creates a viewport with the specified parameters.
@@ -31,15 +31,15 @@ struct Viewport {
      * @return A viewport with the specified parameters.
      */
     static constexpr Viewport create(
-        f64 fov,
-        f64 aspectRatio,
-        f64 distance = 1.0
+        f32 fov,
+        f32 aspectRatio,
+        f32 distance = 1.0F
     ) noexcept {
-        assert(fov > 0.0);
-        assert(aspectRatio > 0.0);
-        assert(distance > 0.0);
-        f64 height = 2.0 * distance * std::tan(fov / 2.0);
-        f64 width = height * aspectRatio;
+        assert(fov > 0.0F);
+        assert(aspectRatio > 0.0F);
+        assert(distance > 0.0F);
+        f32 height = 2.0F * distance * std::tan(fov / 2.0F);
+        f32 width = height * aspectRatio;
         return { width, height, distance };
     }
 

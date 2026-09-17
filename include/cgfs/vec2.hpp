@@ -339,7 +339,7 @@ struct Vec2 {
         const Vec2<T>& b,
         T t
     ) noexcept requires std::floating_point<T> {
-        return a + (b - a) * t;
+        return a * (static_cast<T>(1) - t) + b * t;
     }
 
 };

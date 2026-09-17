@@ -14,22 +14,22 @@ struct PointLight {
     Color color;
 
     /** @brief The intensity of this light. */
-    f64 intensity;
+    f32 intensity;
 
     /** @brief The position of this light. */
-    Vec3<f64> position;
+    Vec3<f32> position;
 
     /** @brief The radius of this light. */
-    f64 radius;
+    f32 radius;
 
     /** @brief The constant attenuation factor of this light. */
-    f64 kc;
+    f32 kc;
 
     /** @brief The linear attenuation factor of this light. */
-    f64 kl;
+    f32 kl;
 
     /** @brief The quadratic attenuation factor of this light. */
-    f64 kq;
+    f32 kq;
 
 };
 
@@ -40,31 +40,31 @@ struct SpotLight {
     Color color;
 
     /** @brief The intensity of this light. */
-    f64 intensity;
+    f32 intensity;
 
     /** @brief The position of this light. */
-    Vec3<f64> position;
+    Vec3<f32> position;
 
     /** @brief The direction this light points towards. */
-    Vec3<f64> direction;
+    Vec3<f32> direction;
 
     /** @brief The radius of this light. */
-    f64 radius;
+    f32 radius;
 
     /** @brief The cosine of the inner cone angle. */
-    f64 innerCutoff;
+    f32 innerCutoff;
 
     /** @brief The cosine of the outer cone angle. */
-    f64 outerCutoff;
+    f32 outerCutoff;
 
     /** @brief The constant attenuation factor of this light. */
-    f64 kc;
+    f32 kc;
 
     /** @brief The linear attenuation factor of this light. */
-    f64 kl;
+    f32 kl;
 
     /** @brief The quadratic attenuation factor of this light. */
-    f64 kq;
+    f32 kq;
 
 };
 
@@ -75,13 +75,13 @@ struct DirectionalLight {
     Color color;
 
     /** @brief The intensity of this light. */
-    f64 intensity;
+    f32 intensity;
 
     /** @brief The direction of this light. */
-    Vec3<f64> direction;
+    Vec3<f32> direction;
 
     /** @brief The radius of this light. */
-    f64 radius;
+    f32 radius;
 
 };
 

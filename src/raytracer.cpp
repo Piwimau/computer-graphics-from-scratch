@@ -6,8 +6,6 @@
 #include <cmath>
 #include <limits>
 #include <numbers>
-#include <optional>
-#include <random>
 #include <ranges>
 #include <thread>
 #include <utility>
@@ -20,16 +18,16 @@ namespace cgfs {
 struct Ray {
 
     /** @brief The origin of this ray. */
-    Vec3<f64> origin;
+    Vec3<f32> origin;
 
     /** @brief The direction of the ray. */
-    Vec3<f64> direction;
+    Vec3<f32> direction;
 
     /** @brief The minimum distance to consider for intersections. */
-    f64 tMin;
+    f32 tMin;
 
     /** @brief The maximum distance to consider for intersections. */
-    f64 tMax;
+    f32 tMax;
 
 };
 
@@ -37,13 +35,10 @@ struct Ray {
 struct Hit {
 
     /** @brief The distance along the ray to the intersection point. */
-    f64 t;
-
-    /** @brief The intersection point. */
-    Vec3<f64> point;
+    f32 t;
 
     /** @brief The surface normal at the intersection point. */
-    Vec3<f64> normal;
+    Vec3<f32> normal;
 
     /** @brief The material at the intersection point. */
     Material material;
@@ -61,7 +56,7 @@ class IorStack final {
 private:
 
     /** @brief The stack of refractive indices. */
-    std::array<f64, MAX_TRACE_DEPTH + 1> _iors;
+    std::array<f32, MAX_TRACE_DEPTH + 1> _iors;
 
     /** @brief The current size of the stack. */
     isize _size;
@@ -72,23 +67,23 @@ public:
     constexpr IorStack() noexcept : _iors({ }), _size(0) { }
 
     /**
-     * @brief Returns the refractive index of the current medium, or `1.0` if
+     * @brief Returns the refractive index of the current medium, or `1.0F` if
      * this stack is empty.
      *
      * @return The refractive index of the current medium.
      */
-    constexpr f64 current() const noexcept {
-        return (_size > 0) ? _iors[_size - 1] : 1.0;
+    constexpr f32 current() const noexcept {
+        return (_size > 0) ? _iors[_size - 1] : 1.0F;
     }
 
     /**
-     * @brief Returns the refractive index of the previous medium, or `1.0` if
+     * @brief Returns the refractive index of the previous medium, or `1.0F` if
      * this stack has fewer than two elements.
      *
      * @return The refractive index of the previous medium.
      */
-    constexpr f64 previous() const noexcept {
-        return (_size > 1) ? _iors[_size - 2] : 1.0;
+    constexpr f32 previous() const noexcept {
+        return (_size > 1) ? _iors[_size - 2] : 1.0F;
     }
 
     /**
@@ -100,9 +95,9 @@ public:
      *
      * @param[in] ior The refractive index of the new medium.
      */
-    constexpr void push(f64 ior) noexcept {
+    constexpr void push(f32 ior) noexcept {
         assert(_size < std::ssize(_iors));
-        assert(ior > 0.0);
+        assert(ior > 0.0F);
         _iors[_size++] = ior;
     }
 
@@ -119,6 +114,75 @@ public:
 
 };
 
+/** @brief Represents a pseudorandom number generator. */
+class Rng final {
+private:
+
+    /** @brief The internal state. */
+    std::array<u32, 4> _state;
+
+    /**
+     * @brief Generates an initial state based on a specified seed.
+     *
+     * @param[in] seed The seed for the initialization.
+     * @return The initial state for the pseudorandom number generator.
+     */
+    static constexpr std::array<u32, 4> make_state(u64 seed) noexcept {
+        auto splitmix64 = [](u64& state) -> u64 {
+            state += 0x9E3779B97F4A7C15ULL;
+            u64 z = state;
+            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+            z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+            return z ^ (z >> 31);
+        };
+        u64 a = splitmix64(seed);
+        u64 b = splitmix64(seed);
+        return {
+            static_cast<u32>(a),
+            static_cast<u32>(a >> 32),
+            static_cast<u32>(b),
+            static_cast<u32>(b >> 32)
+        };
+    }
+
+public:
+
+    /**
+     * @brief Initializes a new pseudorandom number generator with a specified
+     * seed.
+     *
+     * @param[in] seed The seed for the initialization.
+     */
+    constexpr explicit Rng(u64 seed) noexcept : _state(make_state(seed)) { }
+
+    /**
+     * @brief Generates a pseudorandom `u32`.
+     *
+     * @return A pseudorandom `u32`.
+     */
+    constexpr u32 next_u32() noexcept {
+        u32 result = std::rotl(_state[1] * 5, 7) * 9;
+        u32 t = _state[1] << 9;
+        _state[2] ^= _state[0];
+        _state[3] ^= _state[1];
+        _state[1] ^= _state[2];
+        _state[0] ^= _state[3];
+        _state[2] ^= t;
+        _state[3] = std::rotl(_state[3], 11);
+        return result;
+    }
+
+    /**
+     * @brief Generates a pseudorandom `f32` in the range `[0, 1)`.
+     *
+     * @return A pseudorandom `f32` in the range `[0, 1)`.
+     */
+    constexpr f32 next_f32() noexcept {
+        return static_cast<f32>(next_u32() >> 8) * (1.0F / 16777216.0F);
+    }
+
+};
+
 /** @brief Represents a helper to allow overloading of lambdas. */
 template<typename... Ts>
 struct Overloaded : Ts... {
@@ -130,22 +194,25 @@ template<typename... Ts>
 Overloaded(Ts...) -> Overloaded<Ts...>;
 
 /** @brief The value of pi. */
-static constexpr f64 PI = std::numbers::pi_v<f64>;
+static constexpr f32 PI = std::numbers::pi_v<f32>;
 
 /** @brief Represents infinity for floating-point calculations. */
-static constexpr f64 INF = std::numeric_limits<f64>::infinity();
+static constexpr f32 INF = std::numeric_limits<f32>::infinity();
 
 /** @brief The epsilon for floating-point calculations. */
-static constexpr f64 EPS = 1.0E-6;
+static constexpr f32 EPS = 1.0E-6F;
 
 /** @brief The background color used when no objects are intersected. */
-static constexpr Color BACKGROUND_COLOR = { 0.0, 0.0, 0.0 };
+static constexpr Color BACKGROUND_COLOR = { 0.0F, 0.0F, 0.0F };
 
-/** @brief The maximum depth for transparent occluders. */
+/**
+ * @brief The maximum depth for determining the shadow attenuation through
+ * transparent objects.
+ */
 static constexpr isize MAX_TRANSPARENCY_DEPTH = 8;
 
 /** @brief The factor used for gamma correction. */
-static constexpr f64 GAMMA = 2.2;
+static constexpr f32 GAMMA = 2.2F;
 
 /** @brief The maximum number of threads to use for rendering. */
 static const usize MAX_THREADS = std::max<usize>(
@@ -156,35 +223,43 @@ static const usize MAX_THREADS = std::max<usize>(
 /**
  * @brief Tries to intersect a ray with a sphere.
  *
- * @param[in] sphere The sphere to test for intersection.
- * @param[in] ray    The ray to test for intersection.
- * @return An hit on success, otherwise `std::nullopt`.
+ * @param[in]  sphere     The sphere to test for intersection.
+ * @param[in]  ray        The ray to test for intersection.
+ * @param[out] closestHit The hit information if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
  */
-static constexpr std::optional<Hit> intersect_sphere(
+static constexpr bool intersect_sphere(
     const Sphere& sphere,
-    const Ray& ray
+    const Ray& ray,
+    Hit& closestHit
 ) noexcept {
-    Vec3<f64> co = ray.origin - sphere.center;
-    f64 a = ray.direction.dot(ray.direction);
-    f64 b = 2.0 * co.dot(ray.direction);
-    f64 c = co.dot(co) - sphere.radius * sphere.radius;
-    f64 discriminant = b * b - 4.0 * a * c;
-    if (discriminant < 0.0) {
-        return std::nullopt;
+    Vec3<f32> co = ray.origin - sphere.center;
+    f32 a = ray.direction.dot(ray.direction);
+    f32 b = co.dot(ray.direction);
+    f32 c = co.dot(co) - sphere.radius * sphere.radius;
+    f32 d = b * b - a * c;
+    if (d < 0.0F) {
+        return false;
     }
-    f64 t0 = (-b - std::sqrt(discriminant)) / (2.0 * a);
+    f32 q = -(b + std::copysign(std::sqrt(d), b));
+    f32 t0 = q / a;
+    f32 t1 = c / q;
+    if (t0 > t1) {
+        std::swap(t0, t1);
+    }
     if ((t0 >= ray.tMin) && (t0 <= ray.tMax)) {
-        Vec3<f64> point = ray.origin + t0 * ray.direction;
-        Vec3<f64> normal = (point - sphere.center).normalize();
-        return Hit { t0, point, normal, sphere.material };
+        Vec3<f32> point = ray.origin + t0 * ray.direction;
+        Vec3<f32> normal = (point - sphere.center).normalize();
+        closestHit = { t0, normal, sphere.material };
+        return true;
     }
-    f64 t1 = (-b + std::sqrt(discriminant)) / (2.0 * a);
     if ((t1 >= ray.tMin) && (t1 <= ray.tMax)) {
-        Vec3<f64> point = ray.origin + t1 * ray.direction;
-        Vec3<f64> normal = (point - sphere.center).normalize();
-        return Hit { t1, point, normal, sphere.material };
+        Vec3<f32> point = ray.origin + t1 * ray.direction;
+        Vec3<f32> normal = (point - sphere.center).normalize();
+        closestHit = { t1, normal, sphere.material };
+        return true;
     }
-    return std::nullopt;
+    return false;
 }
 
 /**
@@ -198,13 +273,13 @@ static constexpr bool intersect_aabb(
     const Aabb& bounds,
     const Ray& ray
 ) noexcept {
-    f64 tMin = ray.tMin;
-    f64 tMax = ray.tMax;
-    auto slab = [&](f64 min, f64 max, f64 origin, f64 dir) -> bool {
-        f64 invDir = 1.0 / dir;
-        f64 t0 = (min - origin) * invDir;
-        f64 t1 = (max - origin) * invDir;
-        if (invDir < 0.0) {
+    f32 tMin = ray.tMin;
+    f32 tMax = ray.tMax;
+    auto slab = [&](f32 min, f32 max, f32 origin, f32 dir) -> bool {
+        f32 invDir = 1.0F / dir;
+        f32 t0 = (min - origin) * invDir;
+        f32 t1 = (max - origin) * invDir;
+        if (invDir < 0.0F) {
             std::swap(t0, t1);
         }
         tMin = std::max(tMin, t0);
@@ -217,120 +292,109 @@ static constexpr bool intersect_aabb(
 }
 
 /**
- * @brief Tries to intersect a ray with a mesh.
+ * @brief Tries to intersect a ray with a triangle.
  *
- * @param[in] mesh The mesh to test for intersection.
- * @param[in] ray  The ray to test for intersection.
- * @return A hit on success, otherwise `std::nullopt`.
+ * @param[in]  triangle The triangle to test for intersection.
+ * @param[in]  ray      The ray to test for intersection.
+ * @param[out] t        The intersection distance if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
  */
-static constexpr std::optional<Hit> intersect_mesh(
-    const Mesh& mesh,
-    const Ray& ray
+static constexpr bool intersect_triangle(
+    const Triangle& triangle,
+    const Ray& ray,
+    f32& t
 ) noexcept {
-    std::optional<Hit> closestHit;
-    if (mesh.bounds && !intersect_aabb(*mesh.bounds, ray)) {
-        return closestHit;
+    Vec3<f32> e0 = triangle.v1 - triangle.v0;
+    Vec3<f32> e1 = triangle.v2 - triangle.v0;
+    Vec3<f32> a = ray.direction.cross(e1);
+    f32 det = e0.dot(a);
+    if (std::abs(det) < EPS) {
+        return false;
     }
-    for (const auto& [v0, v1, v2] : mesh.triangles()) {
-        Vec3<f64> e0 = v1 - v0;
-        Vec3<f64> e1 = v2 - v0;
-        Vec3<f64> a = ray.direction.cross(e1);
-        f64 det = e0.dot(a);
-        if (std::abs(det) < EPS) {
-            continue;
-        }
-        f64 invDet = 1.0 / det;
-        Vec3<f64> b = ray.origin - v0;
-        f64 u = b.dot(a) * invDet;
-        if ((u < 0.0) || (u > 1.0)) {
-            continue;
-        }
-        Vec3<f64> c = b.cross(e0);
-        f64 v = ray.direction.dot(c) * invDet;
-        if ((v < 0.0) || (u + v > 1.0)) {
-            continue;
-        }
-        f64 t = e1.dot(c) * invDet;
-        if (
-            (t >= ray.tMin) && (t <= ray.tMax)
-                && (!closestHit || (t < closestHit->t))
-        ) {
-            closestHit = {
-                .t = t,
-                .point = ray.origin + t * ray.direction,
-                .normal = e0.cross(e1).normalize(),
-                .material = mesh.material
-            };
-        }
+    f32 invDet = 1.0F / det;
+    Vec3<f32> b = ray.origin - triangle.v0;
+    f32 u = b.dot(a) * invDet;
+    if ((u < 0.0F) || (u > 1.0F)) {
+        return false;
     }
-    return closestHit;
+    Vec3<f32> c = b.cross(e0);
+    f32 v = ray.direction.dot(c) * invDet;
+    if ((v < 0.0F) || (u + v > 1.0F)) {
+        return false;
+    }
+    t = e1.dot(c) * invDet;
+    return (t >= ray.tMin) && (t <= ray.tMax);
 }
 
 /**
- * @brief Finds the closest intersection of a ray with a collection of objects.
+ * @brief Tries to intersect a ray with a mesh.
  *
- * @param[in] objects A collection of objects to test for intersections.
- * @param[in] ray     The ray to test for intersections.
- * @return A hit on success, otherwise `std::nullopt`.
+ * @param[in]  mesh       The mesh to test for intersection.
+ * @param[in]  ray        The ray to test for intersection.
+ * @param[out] closestHit The hit information if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
  */
-static constexpr std::optional<Hit> closest_intersection(
-    std::span<const Object> objects,
-    const Ray& ray
+static constexpr bool intersect_mesh(
+    const Mesh& mesh,
+    const Ray& ray,
+    Hit& closestHit
 ) noexcept {
-    std::optional<Hit> closestHit;
-    for (const Object& object : objects) {
-        Ray updatedRay = {
-            .origin = ray.origin,
-            .direction = ray.direction,
-            .tMin = ray.tMin,
-            .tMax = closestHit ? closestHit->t : ray.tMax
-        };
-        std::optional<Hit> hit = std::visit(
-            Overloaded {
-                [&](const Sphere& sphere) {
-                    return intersect_sphere(sphere, updatedRay);
-                },
-                [&](const Mesh& mesh) {
-                    return intersect_mesh(mesh, updatedRay);
-                }
-            },
-            object
-        );
-        if (hit && (!closestHit || (hit->t < closestHit->t))) {
-            closestHit = hit;
+    if (mesh.bounds && !intersect_aabb(*mesh.bounds, ray)) {
+        return false;
+    }
+    bool foundHit = false;
+    for (const Triangle& triangle : mesh.triangles()) {
+        f32 t;
+        if (
+            intersect_triangle(triangle, ray, t)
+                && (!foundHit || (t < closestHit.t))
+        ) {
+            closestHit = { t, triangle.normal(), mesh.material };
+            foundHit = true;
         }
     }
-    return closestHit;
+    return foundHit;
 }
 
 /**
  * @brief Tries to intersect a ray with a collection of objects.
  *
- * @param[in] objects A collection of objects to test for intersections.
- * @param[in] ray     The ray to test for intersections.
- * @return `true` if the ray intersects any object, otherwise `false`.
+ * @param[in]  objects    A collection of objects to test for intersections.
+ * @param[in]  ray        The ray to test for intersections.
+ * @param[out] closestHit The hit information if an intersection is found.
+ * @return `true` if an intersection is found, otherwise `false`.
  */
-static constexpr bool intersect_any(
+static constexpr bool intersect(
     std::span<const Object> objects,
-    const Ray& ray
+    const Ray& ray,
+    Hit& closestHit
 ) noexcept {
+    bool foundHit = false;
     for (const Object& object : objects) {
-        std::optional<Hit> hit = std::visit(
+        Ray updatedRay = {
+            ray.origin,
+            ray.direction,
+            ray.tMin,
+            foundHit ? closestHit.t : ray.tMax
+        };
+        Hit hit;
+        bool isHit = std::visit(
             Overloaded {
                 [&](const Sphere& sphere) {
-                    return intersect_sphere(sphere, ray);
+                    return intersect_sphere(sphere, updatedRay, hit);
                 },
                 [&](const Mesh& mesh) {
-                    return intersect_mesh(mesh, ray);
+                    return intersect_mesh(mesh, updatedRay, hit);
                 }
             },
             object
         );
-        if (hit) {
-            return true;
+        if (isHit && (!foundHit || (hit.t < closestHit.t))) {
+            closestHit = hit;
+            foundHit = true;
         }
     }
-    return false;
+    return foundHit;
 }
 
 /**
@@ -340,17 +404,17 @@ static constexpr bool intersect_any(
  * @param[in] normal The normal at the intersection point.
  * @return The offset ray origin.
  */
-static constexpr Vec3<f64> offset_ray_origin(
-    const Vec3<f64>& point,
-    const Vec3<f64>& normal
+static constexpr Vec3<f32> offset_ray_origin(
+    const Vec3<f32>& point,
+    const Vec3<f32>& normal
 ) noexcept {
-    constexpr f64 ORIGIN = 1.0 / 32.0;
-    constexpr f64 FLOAT_SCALE = 1.0 / 65536.0;
-    constexpr f64 INT_SCALE = 256.0;
-    auto offset = [](f64 p, f64 n) -> f64 {
-        i64 i = static_cast<i64>(INT_SCALE * n);
-        i64 bits = std::bit_cast<i64>(p);
-        f64 shifted = std::bit_cast<f64>(bits + ((p < 0.0) ? -i : i));
+    constexpr f32 ORIGIN = 1.0F / 32.0F;
+    constexpr f32 FLOAT_SCALE = 1.0F / 65536.0F;
+    constexpr f32 INT_SCALE = 256.0F;
+    auto offset = [](f32 p, f32 n) -> f32 {
+        i32 i = static_cast<i32>(INT_SCALE * n);
+        i32 bits = std::bit_cast<i32>(p);
+        f32 shifted = std::bit_cast<f32>(bits + ((p < 0.0F) ? -i : i));
         return (std::abs(p) < ORIGIN) ? p + FLOAT_SCALE * n : shifted;
     };
     return {
@@ -367,14 +431,14 @@ static constexpr Vec3<f64> offset_ray_origin(
  * @return A pair containing the tangent and bitangent forming an orthonormal
  * basis with the normal.
  */
-static constexpr std::pair<Vec3<f64>, Vec3<f64>> orthonormal_basis(
-    const Vec3<f64>& normal
+static constexpr std::pair<Vec3<f32>, Vec3<f32>> orthonormal_basis(
+    const Vec3<f32>& normal
 ) noexcept {
-    f64 sign = std::copysign(1.0, normal.z);
-    f64 a = -1.0 / (sign + normal.z);
-    f64 b = normal.x * normal.y * a;
+    f32 sign = std::copysign(1.0F, normal.z);
+    f32 a = -1.0F / (sign + normal.z);
+    f32 b = normal.x * normal.y * a;
     return {
-        { 1.0 + sign * normal.x * normal.x * a, sign * b, -sign * normal.x },
+        { 1.0F + sign * normal.x * normal.x * a, sign * b, -sign * normal.x },
         { b, sign + normal.y * normal.y * a, -normal.y }
     };
 }
@@ -382,13 +446,12 @@ static constexpr std::pair<Vec3<f64>, Vec3<f64>> orthonormal_basis(
 /**
  * @brief Uniformly samples a point on a unit disk.
  *
- * @param[in, out] rng The random engine to draw from.
+ * @param[in, out] rng The pseudorandom number generator to draw from.
  * @return A point on the unit disk.
  */
-static Vec2<f64> sample_disk(std::mt19937& rng) noexcept {
-    std::uniform_real_distribution<f64> dist(-1.0, 1.0);
-    f64 r = std::sqrt(dist(rng) * 0.5 + 0.5);
-    f64 theta = (dist(rng) * 0.5 + 0.5) * 2.0 * PI;
+static Vec2<f32> sample_disk(Rng& rng) noexcept {
+    f32 r = std::sqrt(rng.next_f32());
+    f32 theta = rng.next_f32() * 2.0F * PI;
     return { r * std::cos(theta), r * std::sin(theta) };
 }
 
@@ -400,10 +463,10 @@ static Vec2<f64> sample_disk(std::mt19937& rng) noexcept {
  * @param[in] f0       The reflectance at normal incidence.
  * @return The Fresnel reflectance.
  */
-static constexpr Color fresnel_schlick(f64 cosTheta, const Color& f0) noexcept {
-    f64 x = 1.0 - std::clamp(cosTheta, 0.0, 1.0);
-    f64 t = x * x * x * x * x;
-    return Color::lerp(f0, { 1.0, 1.0, 1.0 }, t);
+static constexpr Color fresnel_schlick(f32 cosTheta, const Color& f0) noexcept {
+    f32 x = 1.0F - std::clamp(cosTheta, 0.0F, 1.0F);
+    f32 t = x * x * x * x * x;
+    return Color::lerp(f0, { 1.0F, 1.0F, 1.0F }, t);
 }
 
 /**
@@ -416,83 +479,86 @@ static constexpr Color fresnel_schlick(f64 cosTheta, const Color& f0) noexcept {
  *                          (normalized).
  * @param[in]      material The material of the surface at the point.
  * @param[in]      scene    The scene containing objects and lights.
- * @param[in, out] rng      The random engine to draw from.
+ * @param[in, out] rng      The pseudorandom number generator to draw from.
  * @return The local color at the point.
  */
 static Color local_color(
-    const Vec3<f64>& point,
-    const Vec3<f64>& normal,
-    const Vec3<f64>& viewDir,
+    const Vec3<f32>& point,
+    const Vec3<f32>& normal,
+    const Vec3<f32>& viewDir,
     const Material& material,
     const Scene& scene,
-    std::mt19937& rng
+    Rng& rng
 ) noexcept {
     auto shadow_attenuation = [&](
-        const Vec3<f64>& lightDir,
-        f64 tMax
+        const Vec3<f32>& lightDir,
+        f32 tMax
     ) -> Color {
-        Color attenuation = { 1.0, 1.0, 1.0 };
-        Vec3<f64> origin = offset_ray_origin(point, normal);
+        Color attenuation = { 1.0F, 1.0F, 1.0F };
+        Vec3<f32> origin = offset_ray_origin(point, normal);
         for (isize i = 0; i < MAX_TRANSPARENCY_DEPTH; i++) {
-            std::optional<Hit> hit = closest_intersection(
-                scene.objects,
-                {
-                    .origin = origin,
-                    .direction = lightDir,
-                    .tMin = 0.0,
-                    .tMax = tMax
-                }
+            Ray ray = { origin, lightDir, 0.0F, tMax };
+            Hit hit;
+            if (!intersect(scene.objects, ray, hit)) {
+                break;
+            }
+            f32 t = hit.t;
+            const Material& mat = hit.material;
+            if (!mat.is_transparent()) {
+                attenuation = { 0.0F, 0.0F, 0.0F };
+                break;
+            }
+            attenuation *= mat.albedo * mat.transparency
+                + Color { 1.0F, 1.0F, 1.0F } * (1.0F - mat.transparency);
+            if (attenuation.max() < EPS) {
+                attenuation = { 0.0F, 0.0F, 0.0F };
+                break;
+            }
+            origin = offset_ray_origin(
+                ray.origin + t * ray.direction,
+                hit.normal
             );
-            if (!hit) {
-                break;
-            }
-            if (!hit->material.is_transparent()) {
-                attenuation = { 0.0, 0.0, 0.0 };
-                break;
-            }
-            attenuation *= hit->material.albedo * hit->material.transparency
-                + Color { 1.0, 1.0, 1.0 } * (1.0 - hit->material.transparency);
-            origin = offset_ray_origin(hit->point, hit->normal);
-            tMax -= hit->t;
+            tMax -= t;
         }
         return attenuation;
     };
-    f64 alpha = std::max(material.roughness * material.roughness, EPS);
-    f64 alpha2 = alpha * alpha;
-    f64 nDotV = std::max(normal.dot(viewDir), 0.0);
-    f64 k = (material.roughness + 1.0) * (material.roughness + 1.0) / 8.0;
-    f64 geometryV = nDotV / (nDotV * (1.0 - k) + k);
-    auto lighting = [&](const Vec3<f64>& lightDir) -> Color {
-        Vec3<f64> halfDir = (viewDir + lightDir).normalize();
-        f64 vDotH = std::max(viewDir.dot(halfDir), 0.0);
+    f32 alpha = std::max(material.roughness * material.roughness, EPS);
+    f32 alpha2 = alpha * alpha;
+    f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
+    f32 k = (material.roughness + 1.0F) * (material.roughness + 1.0F) / 8.0F;
+    f32 geometryV = nDotV / (nDotV * (1.0F - k) + k);
+    auto lighting = [&](const Vec3<f32>& lightDir) -> Color {
+        Vec3<f32> halfDir = (viewDir + lightDir).normalize();
+        f32 vDotH = std::max(viewDir.dot(halfDir), 0.0F);
         Color fresnel = fresnel_schlick(vDotH, material.f0);
-        Color diffuse = material.albedo / PI * (Color { 1.0, 1.0, 1.0 } - fresnel)
-            * (1.0 - material.metalness) * (1.0 - material.transparency);
-        f64 nDotH = std::max(normal.dot(halfDir), 0.0);
-        f64 denom = nDotH * nDotH * (alpha2 - 1.0) + 1.0;
-        f64 distribution = alpha2 / (PI * denom * denom);
-        f64 nDotL = std::max(normal.dot(lightDir), 0.0);
-        f64 geometryL = nDotL / (nDotL * (1.0 - k) + k);
-        f64 geometry = geometryV * geometryL;
+        Color diffuse = material.albedo / PI
+            * (Color { 1.0F, 1.0F, 1.0F } - fresnel)
+            * (1.0F - material.metalness) * (1.0F - material.transparency);
+        f32 nDotH = std::max(normal.dot(halfDir), 0.0F);
+        f32 denom = nDotH * nDotH * (alpha2 - 1.0F) + 1.0F;
+        f32 distribution = alpha2 / (PI * denom * denom);
+        f32 nDotL = std::max(normal.dot(lightDir), 0.0F);
+        f32 geometryL = nDotL / (nDotL * (1.0F - k) + k);
+        f32 geometry = geometryV * geometryL;
         Color specular = fresnel
-            * (distribution * geometry / std::max(4.0 * nDotV * nDotL, EPS));
+            * (distribution * geometry / std::max(4.0F * nDotV * nDotL, EPS));
         return (diffuse + specular) * nDotL;
     };
-    Color local = { 0.0, 0.0, 0.0 };
+    Color local = { 0.0F, 0.0F, 0.0F };
     for (const PointLight& light : scene.pointLights) {
-        Vec3<f64> lightPos = light.position;
-        if (light.radius > 0.0) {
-            Vec3<f64> approxDir = (lightPos - point).normalize();
+        Vec3<f32> lightPos = light.position;
+        if (light.radius > 0.0F) {
+            Vec3<f32> approxDir = (lightPos - point).normalize();
             auto [tangent, bitangent] = orthonormal_basis(approxDir);
-            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            Vec2<f32> sample = sample_disk(rng) * light.radius;
             lightPos += tangent * sample.x + bitangent * sample.y;
         }
-        Vec3<f64> lightDir = lightPos - point;
-        f64 distance = lightDir.norm();
+        Vec3<f32> lightDir = lightPos - point;
+        f32 distance = lightDir.norm();
         lightDir = lightDir.normalize();
         Color shadow = shadow_attenuation(lightDir, distance);
-        if (shadow.max() > 0.0) {
-            f64 attenuation = 1.0
+        if (shadow.max() > 0.0F) {
+            f32 attenuation = 1.0F
                 / (light.kc + light.kl * distance
                    + light.kq * distance * distance);
             local += lighting(lightDir) * light.color * light.intensity
@@ -500,29 +566,29 @@ static Color local_color(
         }
     }
     for (const SpotLight& light : scene.spotLights) {
-        Vec3<f64> lightPos = light.position;
-        if (light.radius > 0.0) {
-            Vec3<f64> approxDir = (lightPos - point).normalize();
+        Vec3<f32> lightPos = light.position;
+        if (light.radius > 0.0F) {
+            Vec3<f32> approxDir = (lightPos - point).normalize();
             auto [tangent, bitangent] = orthonormal_basis(approxDir);
-            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            Vec2<f32> sample = sample_disk(rng) * light.radius;
             lightPos += tangent * sample.x + bitangent * sample.y;
         }
-        Vec3<f64> lightDir = lightPos - point;
-        f64 distance = lightDir.norm();
+        Vec3<f32> lightDir = lightPos - point;
+        f32 distance = lightDir.norm();
         lightDir = lightDir.normalize();
         Color shadow = shadow_attenuation(lightDir, distance);
-        if (shadow.max() > 0.0) {
-            f64 cosTheta = (-lightDir).dot(light.direction);
+        if (shadow.max() > 0.0F) {
+            f32 cosTheta = (-lightDir).dot(light.direction);
             if (cosTheta <= light.outerCutoff) {
                 continue;
             }
-            f64 spot = std::clamp(
+            f32 spot = std::clamp(
                 (cosTheta - light.outerCutoff)
                     / (light.innerCutoff - light.outerCutoff),
-                0.0,
-                1.0
+                0.0F,
+                1.0F
             );
-            f64 attenuation = spot
+            f32 attenuation = spot
                 / (light.kc + light.kl * distance
                    + light.kq * distance * distance);
             local += lighting(lightDir) * light.color * light.intensity
@@ -530,15 +596,15 @@ static Color local_color(
         }
     }
     for (const DirectionalLight& light : scene.directionalLights) {
-        Vec3<f64> lightDir = (-light.direction).normalize();
-        if (light.radius > 0.0) {
+        Vec3<f32> lightDir = (-light.direction).normalize();
+        if (light.radius > 0.0F) {
             auto [tangent, bitangent] = orthonormal_basis(lightDir);
-            Vec2<f64> sample = sample_disk(rng) * light.radius;
+            Vec2<f32> sample = sample_disk(rng) * light.radius;
             lightDir = (lightDir + tangent * sample.x + bitangent * sample.y)
                 .normalize();
         }
         Color shadow = shadow_attenuation(lightDir, INF);
-        if (shadow.max() > 0.0) {
+        if (shadow.max() > 0.0F) {
             local += lighting(lightDir) * light.color * light.intensity
                 * shadow;
         }
@@ -554,11 +620,11 @@ static Color local_color(
  * @param[in] distance   The distance traveled through the medium.
  * @return The attenuation applied to light after traveling that distance.
  */
-static Color beer_lambert(const Color& absorption, f64 distance) noexcept {
+static Color beer_lambert(const Color& absorption, f32 distance) noexcept {
     return {
-        .r = std::exp(-absorption.r * distance),
-        .g = std::exp(-absorption.g * distance),
-        .b = std::exp(-absorption.b * distance)
+        std::exp(-absorption.r * distance),
+        std::exp(-absorption.g * distance),
+        std::exp(-absorption.b * distance)
     };
 }
 
@@ -566,56 +632,60 @@ static Color beer_lambert(const Color& absorption, f64 distance) noexcept {
  * @brief Traces a ray through a scene and returns the surface color of the
  * closest object it intersects with.
  *
- * @param[in]      scene The scene containing objects and lights.
- * @param[in]      ray   The ray to trace.
- * @param[in, out] rng   The random engine to draw from.
- * @param[in]      depth The maximum recursion depth.
+ * @param[in]      scene    The scene containing objects and lights.
+ * @param[in]      ray      The ray to trace.
+ * @param[in, out] rng      The pseudorandom number generator to draw from.
+ * @param[in, out] iorStack The stack of indices of refraction for nested
+ *                          transparent materials.
+ * @param[in]      depth    The maximum recursion depth.
  * @return The surface color of the closest object the ray intersects with, or
  * `BACKGROUND_COLOR` if no intersection is found.
  */
 static constexpr Color trace_ray(
     const Scene& scene,
     const Ray& ray,
-    std::mt19937& rng,
-    IorStack iorStack,
+    Rng& rng,
+    IorStack& iorStack,
     isize depth = MAX_TRACE_DEPTH
 ) noexcept {
     assert(depth >= 0);
     Color result = BACKGROUND_COLOR;
-    std::optional<Hit> hit = closest_intersection(scene.objects, ray);
-    if (!hit) {
+    Hit hit;
+    if (!intersect(scene.objects, ray, hit)) {
         return result;
     }
-    const auto& [t, point, normal, material] = *hit;
-    Vec3<f64> viewDir = (-ray.direction).normalize();
+    f32 t = hit.t;
+    Vec3<f32> normal = hit.normal;
+    const Material& material = hit.material;
+    Vec3<f32> point = ray.origin + ray.direction * t;
+    Vec3<f32> viewDir = (-ray.direction).normalize();
     Color local = local_color(point, normal, viewDir, material, scene, rng);
     if (depth == 0) {
         result = local;
         return result;
     }
     if (material.is_transparent()) {
-        bool isEntering = ray.direction.dot(normal) < 0.0;
-        Vec3<f64> n = isEntering ? normal : -normal;
-        f64 previousIor = isEntering ? iorStack.current() : iorStack.previous();
-        f64 eta = isEntering
+        bool isEntering = ray.direction.dot(normal) < 0.0F;
+        Vec3<f32> n = isEntering ? normal : -normal;
+        f32 previousIor = isEntering ? iorStack.current() : iorStack.previous();
+        f32 eta = isEntering
             ? previousIor / material.ior
             : material.ior / previousIor;
         Color fresnel = fresnel_schlick(
-            std::max(-ray.direction.dot(n), 0.0),
+            std::max(-ray.direction.dot(n), 0.0F),
             material.f0
         );
-        std::optional<Vec3<f64>> refractDir = ray.direction.refract(n, eta);
-        std::uniform_real_distribution<f64> dist(0.0, 1.0);
-        bool isReflected = !refractDir || (dist(rng) < fresnel.max());
-        Vec3<f64> nextDir = isReflected ? viewDir.reflect(normal) : *refractDir;
-        if (material.roughness > 0.0) {
+        std::optional<Vec3<f32>> refractDir = ray.direction.refract(n, eta);
+        bool isReflected = !refractDir || (rng.next_f32() < fresnel.max());
+        Vec3<f32> nextDir = isReflected ? viewDir.reflect(normal) : *refractDir;
+        if (material.roughness > 0.0F) {
             auto [tangent, bitangent] = orthonormal_basis(nextDir);
-            f64 alpha = std::max(material.roughness * material.roughness, EPS);
-            Vec2<f64> sample = sample_disk(rng) * alpha;
+            f32 alpha = std::max(material.roughness * material.roughness, EPS);
+            Vec2<f32> sample = sample_disk(rng) * alpha;
             nextDir = (nextDir + tangent * sample.x + bitangent * sample.y)
                 .normalize();
         }
-        if (nextDir.dot(n) * (isReflected ? 1.0 : -1.0) <= 0.0) {
+        if (nextDir.dot(n) * (isReflected ? 1.0F : -1.0F) <= 0.0F) {
             result = local;
             return result;
         }
@@ -627,51 +697,47 @@ static constexpr Color trace_ray(
                 iorStack.pop();
             }
         }
-        Color traced = trace_ray(
-            scene,
-            {
-                .origin = offset_ray_origin(point, isReflected ? n : -n),
-                .direction = nextDir,
-                .tMin = 0.0,
-                .tMax = INF
-            },
-            rng,
-            iorStack,
-            depth - 1
-        );
-        if (!isReflected && !isEntering) {
-            traced *= beer_lambert(material.absorption, t);
+        Ray nextRay = {
+            offset_ray_origin(point, isReflected ? n : -n),
+            nextDir,
+            0.0F,
+            INF
+        };
+        Color traced = trace_ray(scene, nextRay, rng, iorStack, depth - 1);
+        if (!isReflected) {
+            if (isEntering) {
+                iorStack.pop();
+            }
+            else {
+                iorStack.push(material.ior);
+                traced *= beer_lambert(material.absorption, t);
+            }
         }
         result = Color::lerp(local, traced, material.transparency);
         return result;
     }
-    f64 nDotV = std::max(normal.dot(viewDir), 0.0);
-    f64 r = 1.0 - material.roughness;
+    f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
+    f32 r = 1.0F - material.roughness;
     Color reflectance = fresnel_schlick(nDotV, material.f0) * r * r;
     if (reflectance.max() < EPS) {
         result = local;
         return result;
     }
-    Vec3<f64> reflectDir = viewDir.reflect(normal);
-    if (material.roughness > 0.0) {
+    Vec3<f32> reflectDir = viewDir.reflect(normal);
+    if (material.roughness > 0.0F) {
         auto [tangent, bitangent] = orthonormal_basis(reflectDir);
-        f64 alpha = std::max(material.roughness * material.roughness, EPS);
-        Vec2<f64> sample = sample_disk(rng) * alpha;
+        f32 alpha = std::max(material.roughness * material.roughness, EPS);
+        Vec2<f32> sample = sample_disk(rng) * alpha;
         reflectDir = (reflectDir + tangent * sample.x + bitangent * sample.y)
             .normalize();
     }
-    if (reflectDir.dot(normal) <= 0.0) {
+    if (reflectDir.dot(normal) <= 0.0F) {
         result = local;
         return result;
     }
     Color reflected = trace_ray(
         scene,
-        {
-            .origin = offset_ray_origin(point, normal),
-            .direction = reflectDir,
-            .tMin = 0.0,
-            .tMax = INF
-        },
+        { offset_ray_origin(point, normal), reflectDir, 0.0F, INF },
         rng,
         iorStack,
         depth - 1
@@ -688,26 +754,25 @@ static constexpr Color trace_ray(
  */
 static constexpr Color gamma_correct(const Color& color) noexcept {
     return {
-        .r = std::pow(color.r, 1.0 / GAMMA),
-        .g = std::pow(color.g, 1.0 / GAMMA),
-        .b = std::pow(color.b, 1.0 / GAMMA)
+        std::pow(color.r, 1.0F / GAMMA),
+        std::pow(color.g, 1.0F / GAMMA),
+        std::pow(color.b, 1.0F / GAMMA)
     };
 }
 
 void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
     assert(samples > 0);
-    Vec2<f64> canvasSize = {
-        .x = static_cast<f64>(canvas.width()),
-        .y = static_cast<f64>(canvas.height())
+    Vec2<f32> canvasSize = {
+        static_cast<f32>(canvas.width()),
+        static_cast<f32>(canvas.height())
     };
-    Vec2<f64> viewportScale = {
-        .x = scene.viewport.width / canvasSize.x,
-        .y = scene.viewport.height / canvasSize.y
+    Vec2<f32> viewportScale = {
+        scene.viewport.width / canvasSize.x,
+        scene.viewport.height / canvasSize.y
     };
     std::atomic<isize> nextY = 0;
     auto render_row = [&]() -> void {
-        std::random_device device;
-        std::mt19937 rng(device());
+        Rng rng(42);
         isize y;
         while (
             (y = nextY.fetch_add(1, std::memory_order::relaxed))
@@ -717,35 +782,34 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
                 Color sum = { };
                 for (isize sy = 0; sy < samples; sy++) {
                     for (isize sx = 0; sx < samples; sx++) {
-                        Vec3<f64> viewportPos = {
-                            .x = (-canvasSize.x / 2.0 + static_cast<f64>(x)
-                                + (static_cast<f64>(sx) + 0.5)
-                                    / static_cast<f64>(samples))
+                        Vec3<f32> viewportPos = {
+                            (-canvasSize.x / 2.0F + static_cast<f32>(x)
+                                + (static_cast<f32>(sx) + 0.5F)
+                                    / static_cast<f32>(samples))
                                 * viewportScale.x,
-                            .y = (canvasSize.y / 2.0 - 1.0 - static_cast<f64>(y)
-                                - (static_cast<f64>(sy) + 0.5)
-                                    / static_cast<f64>(samples))
+                            (canvasSize.y / 2.0F - 1.0F - static_cast<f32>(y)
+                                - (static_cast<f32>(sy) + 0.5F)
+                                    / static_cast<f32>(samples))
                                 * viewportScale.y,
-                            .z = -scene.viewport.distance
+                            -scene.viewport.distance
                         };
                         Ray ray = {
-                            .origin = scene.camera.viewpoint,
-                            .direction = (scene.camera.rotation * viewportPos)
-                                .normalize(),
-                            .tMin = scene.viewport.distance,
-                            .tMax = INF
+                            scene.camera.viewpoint,
+                            (scene.camera.rotation * viewportPos).normalize(),
+                            scene.viewport.distance,
+                            INF
                         };
                         IorStack iorStack;
-                        iorStack.push(1.0);
+                        iorStack.push(1.0F);
                         sum += trace_ray(scene, ray, rng, iorStack);
                     }
                 }
-                Color avg = sum / static_cast<f64>(samples * samples);
-                Color color = gamma_correct(avg).clamp(0.0, 1.0);
+                Color avg = sum / static_cast<f32>(samples * samples);
+                Color color = gamma_correct(avg).clamp(0.0F, 1.0F);
                 Pixel pixel = {
-                    .r = static_cast<u8>(color.r * 255.0 + 0.5),
-                    .g = static_cast<u8>(color.g * 255.0 + 0.5),
-                    .b = static_cast<u8>(color.b * 255.0 + 0.5)
+                    static_cast<u8>(color.r * 255.0F + 0.5F),
+                    static_cast<u8>(color.g * 255.0F + 0.5F),
+                    static_cast<u8>(color.b * 255.0F + 0.5F)
                 };
                 canvas.put_pixel(x, y, pixel);
             }
