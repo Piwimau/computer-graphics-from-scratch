@@ -38,6 +38,9 @@ struct Hit {
     /** @brief The distance along the ray to the intersection point. */
     f32 t;
 
+    /** @brief The intersection point. */
+    Vec3<f32> point;
+
     /** @brief The surface normal at the intersection point. */
     Vec3<f32> normal;
 
@@ -254,13 +257,13 @@ static constexpr bool intersect_sphere(
     if ((t0 >= ray.tMin) && (t0 <= ray.tMax)) {
         Vec3<f32> point = ray.origin + t0 * ray.direction;
         Vec3<f32> normal = (point - sphere.center).normalize();
-        closestHit = { t0, normal, sphere.material };
+        closestHit = { t0, point, normal, sphere.material };
         return true;
     }
     if ((t1 >= ray.tMin) && (t1 <= ray.tMax)) {
         Vec3<f32> point = ray.origin + t1 * ray.direction;
         Vec3<f32> normal = (point - sphere.center).normalize();
-        closestHit = { t1, normal, sphere.material };
+        closestHit = { t1, point, normal, sphere.material };
         return true;
     }
     return false;
@@ -353,7 +356,12 @@ static constexpr bool intersect_mesh(
             intersect_triangle(triangle, ray, t)
                 && (!foundHit || (t < closestHit.t))
         ) {
-            closestHit = { t, triangle.normal(), mesh.material };
+            closestHit = {
+                t,
+                ray.origin + ray.direction * t,
+                triangle.normal(),
+                mesh.material
+            };
             foundHit = true;
         }
     }
@@ -384,10 +392,10 @@ static constexpr bool intersect(
         Hit hit;
         bool isHit = std::visit(
             Overloaded {
-                [&updatedRay, &hit](const Sphere& sphere) {
+                [&](const Sphere& sphere) {
                     return intersect_sphere(sphere, updatedRay, hit);
                 },
-                [&updatedRay, &hit](const Mesh& mesh) {
+                [&](const Mesh& mesh) {
                     return intersect_mesh(mesh, updatedRay, hit);
                 }
             },
@@ -429,46 +437,9 @@ static constexpr Vec3<f32> offset_ray_origin(
 }
 
 /**
- * @brief Computes the attenuation of light along a shadow ray.
- *
- * @param[in] objects   The objects to test for intersections.
- * @param[in] shadowRay The shadow ray along which to compute the attenuation.
- * @return The attenuation of light along the shadow ray.
- */
-static constexpr Color shadow_attenuation(
-    std::span<const Object> objects,
-    Ray shadowRay
-) noexcept {
-    Color attenuation = { 1.0F, 1.0F, 1.0F };
-    for (isize i = 0; i < MAX_TRANSPARENCY_DEPTH; i++) {
-        Hit hit;
-        if (!intersect(objects, shadowRay, hit)) {
-            break;
-        }
-        const Material& material = hit.material;
-        if (!material.is_transparent()) {
-            attenuation = { 0.0F, 0.0F, 0.0F };
-            break;
-        }
-        attenuation *= material.albedo * material.transparency
-            + Color { 1.0F, 1.0F, 1.0F } * (1.0F - material.transparency);
-        if (attenuation.max() < EPS) {
-            attenuation = { 0.0F, 0.0F, 0.0F };
-            break;
-        }
-        shadowRay.origin = offset_ray_origin(
-            shadowRay.origin + hit.t * shadowRay.direction,
-            hit.normal
-        );
-        shadowRay.tMax -= hit.t;
-    }
-    return attenuation;
-}
-
-/**
  * @brief Computes an orthonormal basis around a normal.
  *
- * @param[in] normal A normal around which to compute the basis (normalized).
+ * @param[in] normal The normal around which to compute the basis (normalized).
  * @return A pair containing the tangent and bitangent forming an orthonormal
  * basis with the normal.
  */
@@ -497,9 +468,28 @@ static constexpr Vec2<f32> sample_disk(Rng& rng) noexcept {
 }
 
 /**
+ * @brief Perturbs a direction vector based on the roughness of a surface.
+ *
+ * @param[in]      direction The original direction (normalized).
+ * @param[in]      roughness The roughness of the surface.
+ * @param[in, out] rng       The pseudorandom number generator to draw from.
+ * @return The perturbed direction vector.
+ */
+static constexpr Vec3<f32> perturb_direction(
+    const Vec3<f32>& direction,
+    f32 roughness,
+    Rng& rng
+) noexcept {
+    auto [tangent, bitangent] = orthonormal_basis(direction);
+    f32 alpha = std::max(roughness * roughness, EPS);
+    Vec2<f32> sample = sample_disk(rng) * alpha;
+    return (direction + tangent * sample.x + bitangent * sample.y).normalize();
+}
+
+/**
  * @brief Uniformly samples a point on a hemisphere around a normal.
  *
- * @param[in]      normal The normalized normal around which to sample.
+ * @param[in]      normal The normal around which to sample (normalized).
  * @param[in, out] rng    The pseudorandom number generator to draw from.
  * @return A point on the hemisphere around the normal.
  */
@@ -548,12 +538,29 @@ static constexpr Color local_color(
     const Scene& scene,
     Rng& rng
 ) noexcept {
+    auto jitter_position = [&](const Vec3<f32>& pos, f32 radius) {
+        if (radius <= 0.0F) {
+            return pos;
+        }
+        Vec3<f32> approxDir = (pos - point).normalize();
+        auto [tangent, bitangent] = orthonormal_basis(approxDir);
+        Vec2<f32> sample = sample_disk(rng) * radius;
+        return pos + tangent * sample.x + bitangent * sample.y;
+    };
+    auto jitter_direction = [&](const Vec3<f32>& dir, f32 radius) {
+        if (radius <= 0.0F) {
+            return dir;
+        }
+        auto [tangent, bitangent] = orthonormal_basis(dir);
+        Vec2<f32> sample = sample_disk(rng) * radius;
+        return (dir + tangent * sample.x + bitangent * sample.y).normalize();
+    };
     f32 alpha = std::max(material.roughness * material.roughness, EPS);
     f32 alpha2 = alpha * alpha;
     f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
     f32 k = (material.roughness + 1.0F) * (material.roughness + 1.0F) / 8.0F;
     f32 geometryV = nDotV / (nDotV * (1.0F - k) + k);
-    auto lighting = [&](const Vec3<f32>& lightDir) {
+    auto shading = [&](const Vec3<f32>& lightDir) {
         Vec3<f32> halfDir = (viewDir + lightDir).normalize();
         f32 vDotH = std::max(viewDir.dot(halfDir), 0.0F);
         Color fresnel = fresnel_schlick(vDotH, material.f0);
@@ -570,90 +577,117 @@ static constexpr Color local_color(
             * (distribution * geometry / std::max(4.0F * nDotV * nDotL, EPS));
         return (diffuse + specular) * nDotL;
     };
+    auto distance_attenuation = [](const auto& light, f32 distance) {
+        return 1.0F
+            / (light.kc + light.kl * distance + light.kq * distance * distance);
+    };
+    auto shadow_attenuation = [](
+        std::span<const Object> objects,
+        Ray shadowRay
+    ) {
+        Color attenuation = { 1.0F, 1.0F, 1.0F };
+        for (isize i = 0; i < MAX_TRANSPARENCY_DEPTH; i++) {
+            Hit hit;
+            if (!intersect(objects, shadowRay, hit)) {
+                break;
+            }
+            const Material& mat = hit.material;
+            if (!mat.is_transparent()) {
+                attenuation = { 0.0F, 0.0F, 0.0F };
+                break;
+            }
+            attenuation *= mat.albedo * mat.transparency
+                + Color { 1.0F, 1.0F, 1.0F } * (1.0F - mat.transparency);
+            if (attenuation.max() < EPS) {
+                attenuation = { 0.0F, 0.0F, 0.0F };
+                break;
+            }
+            shadowRay.origin = offset_ray_origin(hit.point, hit.normal);
+            shadowRay.tMax -= hit.t;
+        }
+        return attenuation;
+    };
     Color local = { 0.0F, 0.0F, 0.0F };
     for (const PointLight& light : scene.pointLights) {
-        Vec3<f32> lightPos = light.position;
-        if (light.radius > 0.0F) {
-            Vec3<f32> approxDir = (lightPos - point).normalize();
-            auto [tangent, bitangent] = orthonormal_basis(approxDir);
-            Vec2<f32> sample = sample_disk(rng) * light.radius;
-            lightPos += tangent * sample.x + bitangent * sample.y;
-        }
+        Vec3<f32> lightPos = jitter_position(light.position, light.radius);
         Vec3<f32> lightDir = lightPos - point;
         f32 distance = lightDir.norm();
-        lightDir = lightDir.normalize();
+        lightDir /= distance;
         Ray shadowRay = {
             offset_ray_origin(point, lightDir),
             lightDir,
             0.0F,
             distance
         };
-        Color shadow = shadow_attenuation(scene.objects, shadowRay);
-        if (shadow.max() > 0.0F) {
-            f32 attenuation = 1.0F
-                / (light.kc + light.kl * distance
-                   + light.kq * distance * distance);
-            local += lighting(lightDir) * light.color * light.intensity
-                * attenuation * shadow;
-        }
+        local += shading(lightDir) * light.color * light.intensity
+            * distance_attenuation(light, distance)
+            * shadow_attenuation(scene.objects, shadowRay);
     }
     for (const SpotLight& light : scene.spotLights) {
-        Vec3<f32> lightPos = light.position;
-        if (light.radius > 0.0F) {
-            Vec3<f32> approxDir = (lightPos - point).normalize();
-            auto [tangent, bitangent] = orthonormal_basis(approxDir);
-            Vec2<f32> sample = sample_disk(rng) * light.radius;
-            lightPos += tangent * sample.x + bitangent * sample.y;
-        }
+        Vec3<f32> lightPos = jitter_position(light.position, light.radius);
         Vec3<f32> lightDir = lightPos - point;
         f32 distance = lightDir.norm();
-        lightDir = lightDir.normalize();
+        lightDir /= distance;
         Ray shadowRay = {
             offset_ray_origin(point, lightDir),
             lightDir,
             0.0F,
             distance
         };
-        Color shadow = shadow_attenuation(scene.objects, shadowRay);
-        if (shadow.max() > 0.0F) {
-            f32 cosTheta = (-lightDir).dot(light.direction);
-            if (cosTheta <= light.outerCutoff) {
-                continue;
-            }
-            f32 spot = std::clamp(
-                (cosTheta - light.outerCutoff)
-                    / (light.innerCutoff - light.outerCutoff),
-                0.0F,
-                1.0F
-            );
-            f32 attenuation = spot
-                / (light.kc + light.kl * distance
-                   + light.kq * distance * distance);
-            local += lighting(lightDir) * light.color * light.intensity
-                * attenuation * shadow;
+        f32 cosTheta = (-lightDir).dot(light.direction);
+        if (cosTheta <= light.outerCutoff) {
+            continue;
         }
+        f32 spot = std::clamp(
+            (cosTheta - light.outerCutoff)
+                / (light.innerCutoff - light.outerCutoff),
+            0.0F,
+            1.0F
+        );
+        local += shading(lightDir) * light.color * light.intensity
+            * distance_attenuation(light, distance)
+            * shadow_attenuation(scene.objects, shadowRay) * spot;
     }
     for (const DirectionalLight& light : scene.directionalLights) {
-        Vec3<f32> lightDir = (-light.direction).normalize();
-        if (light.radius > 0.0F) {
-            auto [tangent, bitangent] = orthonormal_basis(lightDir);
-            Vec2<f32> sample = sample_disk(rng) * light.radius;
-            lightDir = (lightDir + tangent * sample.x + bitangent * sample.y)
-                .normalize();
-        }
+        Vec3<f32> lightDir = jitter_direction(
+            (-light.direction).normalize(),
+            light.radius
+        );
         Ray shadowRay = {
             offset_ray_origin(point, lightDir),
             lightDir,
             0.0F,
             INF
         };
-        Color shadow = shadow_attenuation(scene.objects, shadowRay);
-        if (shadow.max() > 0.0F) {
-            local += lighting(lightDir) * light.color * light.intensity
-                * shadow;
-        }
+        local += shading(lightDir) * light.color * light.intensity
+            * shadow_attenuation(scene.objects, shadowRay);
     }
     return local;
+}
+
+/**
+ * @brief Decides whether a ray should keep bouncing.
+ *
+ * @param[in]      depth        The remaining recursion depth.
+ * @param[in]      contribution The current contribution of the ray.
+ * @param[in, out] rng          The pseudorandom number generator to draw from.
+ * @return The compensation weight if the ray survives, or `std::nullopt` if it
+ * should be terminated.
+ */
+static constexpr std::optional<f32> russian_roulette(
+    isize depth,
+    const Color& contribution,
+    Rng& rng
+) noexcept {
+    isize bounces = MAX_BOUNCES - depth;
+    if (bounces < MIN_BOUNCES) {
+        return 1.0F;
+    }
+    f32 survival = std::clamp(contribution.max(), MIN_SURVIVAL, 1.0F);
+    if (rng.next_f32() >= survival) {
+        return std::nullopt;
+    }
+    return 1.0F / survival;
 }
 
 /**
@@ -695,29 +729,19 @@ static constexpr Color trace_ray(
     Color contribution = { 1.0F, 1.0F, 1.0F }
 ) noexcept {
     assert(depth >= 0);
-    Color result = BACKGROUND_COLOR;
     Hit hit;
     if (!intersect(scene.objects, ray, hit)) {
-        return result;
+        return BACKGROUND_COLOR;
     }
-    f32 t = hit.t;
-    Vec3<f32> normal = hit.normal;
-    const Material& material = hit.material;
-    Vec3<f32> point = ray.origin + ray.direction * t;
-    Vec3<f32> viewDir = (-ray.direction).normalize();
+    const auto& [t, point, normal, material] = hit;
+    Vec3<f32> viewDir = -ray.direction;
     Color local = local_color(point, normal, viewDir, material, scene, rng);
     if (depth == 0) {
-        result = local;
-        return result;
+        return local;
     }
-    f32 weight = 1.0F;
-    if (MAX_BOUNCES - depth >= MIN_BOUNCES) {
-        f32 survival = std::clamp(contribution.max(), MIN_SURVIVAL, 1.0F);
-        if (rng.next_f32() >= survival) {
-            result = local;
-            return result;
-        }
-        weight = 1.0F / survival;
+    std::optional<f32> weight = russian_roulette(depth, contribution, rng);
+    if (!weight) {
+        return local;
     }
     if (material.is_transparent()) {
         bool isEntering = ray.direction.dot(normal) < 0.0F;
@@ -726,23 +750,18 @@ static constexpr Color trace_ray(
         f32 eta = isEntering
             ? previousIor / material.ior
             : material.ior / previousIor;
+        std::optional<Vec3<f32>> refractDir = ray.direction.refract(n, eta);
         Color fresnel = fresnel_schlick(
-            std::max(-ray.direction.dot(n), 0.0F),
+            std::max(viewDir.dot(n), 0.0F),
             material.f0
         );
-        std::optional<Vec3<f32>> refractDir = ray.direction.refract(n, eta);
         bool isReflected = !refractDir || (rng.next_f32() < fresnel.max());
         Vec3<f32> nextDir = isReflected ? viewDir.reflect(normal) : *refractDir;
         if (material.roughness > 0.0F) {
-            auto [tangent, bitangent] = orthonormal_basis(nextDir);
-            f32 alpha = std::max(material.roughness * material.roughness, EPS);
-            Vec2<f32> sample = sample_disk(rng) * alpha;
-            nextDir = (nextDir + tangent * sample.x + bitangent * sample.y)
-                .normalize();
+            nextDir = perturb_direction(nextDir, material.roughness, rng);
         }
         if (nextDir.dot(n) * (isReflected ? 1.0F : -1.0F) <= 0.0F) {
-            result = local;
-            return result;
+            return local;
         }
         if (!isReflected) {
             if (isEntering) {
@@ -758,13 +777,13 @@ static constexpr Color trace_ray(
             0.0F,
             INF
         };
-        Color traced = weight * trace_ray(
+        Color traced = *weight * trace_ray(
             scene,
             nextRay,
             rng,
             iorStack,
             depth - 1,
-            contribution * weight
+            contribution * *weight
         );
         if (!isReflected) {
             if (isEntering) {
@@ -775,51 +794,49 @@ static constexpr Color trace_ray(
                 traced *= beer_lambert(material.absorption, t);
             }
         }
-        result = Color::lerp(local, traced, material.transparency);
-        return result;
-    }
-    f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
-    f32 r = 1.0F - material.roughness;
-    Color specWeight = fresnel_schlick(nDotV, material.f0) * r * r;
-    Color diffWeight = material.albedo * (1.0F - material.metalness);
-    f32 totalWeight = specWeight.max() + diffWeight.max();
-    if (totalWeight < EPS) {
-        result = local;
-        return result;
-    }
-    f32 pSpecular = std::clamp(specWeight.max() / totalWeight, 0.05F, 0.95F);
-    Vec3<f32> nextDir;
-    Color lobeWeight;
-    if (rng.next_f32() < pSpecular) {
-        nextDir = viewDir.reflect(normal);
-        if (material.roughness > 0.0F) {
-            auto [tangent, bitangent] = orthonormal_basis(nextDir);
-            f32 alpha = std::max(material.roughness * material.roughness, EPS);
-            Vec2<f32> sample = sample_disk(rng) * alpha;
-            nextDir = (nextDir + tangent * sample.x + bitangent * sample.y)
-                .normalize();
-        }
-        if (nextDir.dot(normal) <= 0.0F) {
-            result = local;
-            return result;
-        }
-        lobeWeight = specWeight / pSpecular;
+        return Color::lerp(local, traced, material.transparency);
     }
     else {
-        nextDir = sample_hemisphere(normal, rng);
-        lobeWeight = diffWeight / (1.0F - pSpecular);
+        f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
+        f32 r = 1.0F - material.roughness;
+        Color specWeight = fresnel_schlick(nDotV, material.f0) * r * r;
+        Color diffWeight = material.albedo * (1.0F - material.metalness);
+        f32 totalWeight = specWeight.max() + diffWeight.max();
+        if (totalWeight < EPS) {
+            return local;
+        }
+        f32 pSpecular = std::clamp(
+            specWeight.max() / totalWeight,
+            0.05F,
+            0.95F
+        );
+        Vec3<f32> nextDir;
+        Color lobeWeight;
+        if (rng.next_f32() < pSpecular) {
+            nextDir = viewDir.reflect(normal);
+            if (material.roughness > 0.0F) {
+                nextDir = perturb_direction(nextDir, material.roughness, rng);
+            }
+            if (nextDir.dot(normal) <= 0.0F) {
+                return local;
+            }
+            lobeWeight = specWeight / pSpecular;
+        }
+        else {
+            nextDir = sample_hemisphere(normal, rng);
+            lobeWeight = diffWeight / (1.0F - pSpecular);
+        }
+        Ray nextRay = { offset_ray_origin(point, normal), nextDir, 0.0F, INF };
+        Color traced = trace_ray(
+            scene,
+            nextRay,
+            rng,
+            iorStack,
+            depth - 1,
+            contribution * *weight * lobeWeight
+        );
+        return local + traced * *weight * lobeWeight;
     }
-    Ray nextRay = { offset_ray_origin(point, normal), nextDir, 0.0F, INF };
-    Color traced = trace_ray(
-        scene,
-        nextRay,
-        rng,
-        iorStack,
-        depth - 1,
-        contribution * weight * lobeWeight
-    );
-    result = local + traced * weight * lobeWeight;
-    return result;
 }
 
 /**
@@ -905,7 +922,7 @@ static constexpr void render_row(
 void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
     assert(samples > 0);
     std::atomic<isize> nextY = 0;
-    auto worker = [&scene, &canvas, samples, &nextY]() {
+    auto worker = [&]() {
         while (true) {
             isize y = nextY.fetch_add(1, std::memory_order::relaxed);
             if (y >= canvas.height()) {
