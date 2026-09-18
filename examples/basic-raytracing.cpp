@@ -83,7 +83,7 @@ int main() {
             { 0.0F, 0.0F, -1.0F }
         )
     };
-    cgfs::raytrace(scene, canvas, 16);
+    cgfs::raytrace(scene, canvas, 32);
     cgfs::save_ppm(canvas, "output.ppm");
     return EXIT_SUCCESS;
 }

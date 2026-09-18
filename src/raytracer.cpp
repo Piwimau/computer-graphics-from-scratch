@@ -46,8 +46,14 @@ struct Hit {
 
 };
 
-/** @brief The maximum recursion depth for ray tracing. */
-static constexpr isize MAX_TRACE_DEPTH = 3;
+/** @brief The minimum number of recursive bounces. */
+static constexpr isize MIN_BOUNCES = 3;
+
+/** @brief The maximum number of recursive bounces. */
+static constexpr isize MAX_BOUNCES = 32;
+
+/** @brief The minimum contribution for a ray to survive. */
+static constexpr f32 MIN_SURVIVAL = 0.05F;
 
 /**
  * @brief Represents a simple stack for tracking refractive indices of
@@ -57,7 +63,7 @@ class IorStack final {
 private:
 
     /** @brief The stack of refractive indices. */
-    std::array<f32, MAX_TRACE_DEPTH + 1> _iors = { };
+    std::array<f32, MAX_BOUNCES + 1> _iors = { };
 
     /** @brief The current size of the stack. */
     isize _size = 0;
@@ -491,6 +497,23 @@ static constexpr Vec2<f32> sample_disk(Rng& rng) noexcept {
 }
 
 /**
+ * @brief Uniformly samples a point on a hemisphere around a normal.
+ *
+ * @param[in]      normal The normalized normal around which to sample.
+ * @param[in, out] rng    The pseudorandom number generator to draw from.
+ * @return A point on the hemisphere around the normal.
+ */
+static constexpr Vec3<f32> sample_hemisphere(
+    const Vec3<f32>& normal,
+    Rng& rng
+) noexcept {
+    Vec2<f32> disk = sample_disk(rng);
+    f32 z = std::sqrt(std::max(0.0F, 1.0F - disk.x * disk.x - disk.y * disk.y));
+    auto [tangent, bitangent] = orthonormal_basis(normal);
+    return (tangent * disk.x + bitangent * disk.y + normal * z).normalize();
+}
+
+/**
  * @brief Computes the Fresnel reflectance using the Schlick approximation.
  *
  * @param[in] cosTheta The cosine of the angle between the view/light direction
@@ -653,12 +676,13 @@ static Color beer_lambert(const Color& absorption, f32 distance) noexcept {
  * @brief Traces a ray through a scene and returns the surface color of the
  * closest object it intersects with.
  *
- * @param[in]      scene    The scene containing objects and lights.
- * @param[in]      ray      The ray to trace.
- * @param[in, out] rng      The pseudorandom number generator to draw from.
- * @param[in, out] iorStack The stack of indices of refraction for nested
- *                          transparent materials.
- * @param[in]      depth    The maximum recursion depth.
+ * @param[in]      scene        The scene containing objects and lights.
+ * @param[in]      ray          The ray to trace.
+ * @param[in, out] rng          The pseudorandom number generator to draw from.
+ * @param[in, out] iorStack     The stack of indices of refraction for nested
+ *                              transparent materials.
+ * @param[in]      depth        The maximum recursion depth.
+ * @param[in]      contribution The current contribution of the ray.
  * @return The surface color of the closest object the ray intersects with, or
  * `BACKGROUND_COLOR` if no intersection is found.
  */
@@ -667,7 +691,8 @@ static constexpr Color trace_ray(
     const Ray& ray,
     Rng& rng,
     IorStack& iorStack,
-    isize depth = MAX_TRACE_DEPTH
+    isize depth = MAX_BOUNCES,
+    Color contribution = { 1.0F, 1.0F, 1.0F }
 ) noexcept {
     assert(depth >= 0);
     Color result = BACKGROUND_COLOR;
@@ -684,6 +709,15 @@ static constexpr Color trace_ray(
     if (depth == 0) {
         result = local;
         return result;
+    }
+    f32 weight = 1.0F;
+    if (MAX_BOUNCES - depth >= MIN_BOUNCES) {
+        f32 survival = std::clamp(contribution.max(), MIN_SURVIVAL, 1.0F);
+        if (rng.next_f32() >= survival) {
+            result = local;
+            return result;
+        }
+        weight = 1.0F / survival;
     }
     if (material.is_transparent()) {
         bool isEntering = ray.direction.dot(normal) < 0.0F;
@@ -724,7 +758,14 @@ static constexpr Color trace_ray(
             0.0F,
             INF
         };
-        Color traced = trace_ray(scene, nextRay, rng, iorStack, depth - 1);
+        Color traced = weight * trace_ray(
+            scene,
+            nextRay,
+            rng,
+            iorStack,
+            depth - 1,
+            contribution * weight
+        );
         if (!isReflected) {
             if (isEntering) {
                 iorStack.pop();
@@ -739,31 +780,45 @@ static constexpr Color trace_ray(
     }
     f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
     f32 r = 1.0F - material.roughness;
-    Color reflectance = fresnel_schlick(nDotV, material.f0) * r * r;
-    if (reflectance.max() < EPS) {
+    Color specWeight = fresnel_schlick(nDotV, material.f0) * r * r;
+    Color diffWeight = material.albedo * (1.0F - material.metalness);
+    f32 totalWeight = specWeight.max() + diffWeight.max();
+    if (totalWeight < EPS) {
         result = local;
         return result;
     }
-    Vec3<f32> reflectDir = viewDir.reflect(normal);
-    if (material.roughness > 0.0F) {
-        auto [tangent, bitangent] = orthonormal_basis(reflectDir);
-        f32 alpha = std::max(material.roughness * material.roughness, EPS);
-        Vec2<f32> sample = sample_disk(rng) * alpha;
-        reflectDir = (reflectDir + tangent * sample.x + bitangent * sample.y)
-            .normalize();
+    f32 pSpecular = std::clamp(specWeight.max() / totalWeight, 0.05F, 0.95F);
+    Vec3<f32> nextDir;
+    Color lobeWeight;
+    if (rng.next_f32() < pSpecular) {
+        nextDir = viewDir.reflect(normal);
+        if (material.roughness > 0.0F) {
+            auto [tangent, bitangent] = orthonormal_basis(nextDir);
+            f32 alpha = std::max(material.roughness * material.roughness, EPS);
+            Vec2<f32> sample = sample_disk(rng) * alpha;
+            nextDir = (nextDir + tangent * sample.x + bitangent * sample.y)
+                .normalize();
+        }
+        if (nextDir.dot(normal) <= 0.0F) {
+            result = local;
+            return result;
+        }
+        lobeWeight = specWeight / pSpecular;
     }
-    if (reflectDir.dot(normal) <= 0.0F) {
-        result = local;
-        return result;
+    else {
+        nextDir = sample_hemisphere(normal, rng);
+        lobeWeight = diffWeight / (1.0F - pSpecular);
     }
-    Color reflected = trace_ray(
+    Ray nextRay = { offset_ray_origin(point, normal), nextDir, 0.0F, INF };
+    Color traced = trace_ray(
         scene,
-        { offset_ray_origin(point, normal), reflectDir, 0.0F, INF },
+        nextRay,
         rng,
         iorStack,
-        depth - 1
+        depth - 1,
+        contribution * weight * lobeWeight
     );
-    result = Color::lerp(local, reflected, reflectance);
+    result = local + traced * weight * lobeWeight;
     return result;
 }
 
