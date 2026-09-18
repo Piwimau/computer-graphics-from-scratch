@@ -592,7 +592,7 @@ static constexpr Color local_color(
                 break;
             }
             const Material& mat = hit.material;
-            if (!mat.is_transparent()) {
+            if (mat.is_opaque()) {
                 attenuation = { 0.0F, 0.0F, 0.0F };
                 break;
             }
@@ -735,7 +735,8 @@ static constexpr Color trace_ray(
     }
     const auto& [t, point, normal, material] = hit;
     Vec3<f32> viewDir = -ray.direction;
-    Color local = local_color(point, normal, viewDir, material, scene, rng);
+    Color local = local_color(point, normal, viewDir, material, scene, rng)
+        + material.emission;
     if (depth == 0) {
         return local;
     }
