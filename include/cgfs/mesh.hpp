@@ -87,7 +87,7 @@ struct Mesh {
         return indices
             | std::views::chunk(3)
             | std::views::transform(
-                [this](auto&& chunk) {
+                [this](const auto& chunk) {
                     return Triangle {
                         vertices[chunk[0]],
                         vertices[chunk[1]],

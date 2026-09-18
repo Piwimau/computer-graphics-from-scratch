@@ -3,8 +3,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <memory>
 #include <span>
+#include <vector>
 #include "cgfs/types.hpp"
 
 namespace cgfs {
@@ -28,7 +28,7 @@ class Canvas final {
 private:
 
     /** @brief The pixels of this canvas. */
-    std::unique_ptr<Pixel[]> _pixels;
+    std::vector<Pixel> _pixels;
 
     /** @brief The width of this canvas. */
     isize _width;
@@ -37,25 +37,24 @@ private:
     isize _height;
 
     /**
-     * @brief Initializes a new canvas with the specified pixels, width, and
-     * height.
+     * @brief Initializes a new canvas with the specified properties.
      *
-     * @warning The behavior is undefined if `pixels` is `nullptr`, or if
-     * `width` or `height` is negative.
+     * @warning The behavior is undefined if `pixels` does not have `width *
+     * height` elements, or if `width` or `height` is negative.
      *
      * @param[in] pixels The pixels of the canvas.
      * @param[in] width  The width of the canvas.
      * @param[in] height The height of the canvas.
      */
     constexpr Canvas(
-        std::unique_ptr<Pixel[]> pixels,
+        std::vector<Pixel> pixels,
         isize width,
         isize height
     ) noexcept
         : _pixels(std::move(pixels)), _width(width), _height(height) {
-        assert(_pixels != nullptr);
         assert(_width >= 0);
         assert(_height >= 0);
+        assert(std::ssize(_pixels) == width * height);
     }
 
 public:
@@ -74,9 +73,11 @@ public:
     static constexpr Canvas empty(isize width, isize height) {
         assert(width >= 0);
         assert(height >= 0);
-        auto pixels = std::make_unique_for_overwrite<Pixel[]>(width * height);
-        std::ranges::fill_n(pixels.get(), width * height, Pixel { 0, 0, 0 });
-        return Canvas(std::move(pixels), width, height);
+        return Canvas(
+            std::vector<Pixel>(width * height, { 0, 0, 0 }),
+            width,
+            height
+        );
     }
 
     /**
@@ -85,7 +86,7 @@ public:
      * @return A span of the pixels of this canvas.
      */
     constexpr std::span<const Pixel> pixels() const noexcept {
-        return std::span<const Pixel>(_pixels.get(), _width * _height);
+        return std::span<const Pixel>(_pixels);
     }
 
     /**

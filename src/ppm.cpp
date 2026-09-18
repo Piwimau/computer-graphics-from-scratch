@@ -5,12 +5,25 @@
 #include <stdexcept>
 #include "cgfs/ppm.hpp"
 #include "cgfs/types.hpp"
-#include "func-deleter.hpp"
 
 namespace cgfs {
 
 /** @brief Represents a custom deleter for `std::FILE` handles. */
-using FileDeleter = FuncDeleter<&std::fclose>;
+struct FileDeleter {
+
+    /**
+     * @brief Deletes a `std::FILE` handle.
+     *
+     * @warning The behavior is undefined if `file` is a `nullptr` or if it has
+     * already been closed.
+     *
+     * @param[in, out] file The `std::FILE` handle to delete.
+     */
+    void operator()(std::FILE* file) const noexcept {
+        std::fclose(file);
+    }
+
+};
 
 void save_ppm(const Canvas& canvas, const std::string& path) {
     std::unique_ptr<std::FILE, FileDeleter> file(

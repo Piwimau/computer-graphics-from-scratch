@@ -6,6 +6,7 @@
 #include <cmath>
 #include <limits>
 #include <numbers>
+#include <random>
 #include <ranges>
 #include <thread>
 #include <utility>
@@ -56,15 +57,12 @@ class IorStack final {
 private:
 
     /** @brief The stack of refractive indices. */
-    std::array<f32, MAX_TRACE_DEPTH + 1> _iors;
+    std::array<f32, MAX_TRACE_DEPTH + 1> _iors = { };
 
     /** @brief The current size of the stack. */
-    isize _size;
+    isize _size = 0;
 
 public:
-
-    /** @brief Initializes an new stack of refractive indices. */
-    constexpr IorStack() noexcept : _iors({ }), _size(0) { }
 
     /**
      * @brief Returns the refractive index of the current medium, or `1.0F` if
@@ -128,7 +126,7 @@ private:
      * @return The initial state for the pseudorandom number generator.
      */
     static constexpr std::array<u32, 4> make_state(u64 seed) noexcept {
-        auto splitmix64 = [](u64& state) -> u64 {
+        auto splitmix64 = [](u64& state) {
             state += 0x9E3779B97F4A7C15ULL;
             u64 z = state;
             z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
@@ -275,7 +273,7 @@ static constexpr bool intersect_aabb(
 ) noexcept {
     f32 tMin = ray.tMin;
     f32 tMax = ray.tMax;
-    auto slab = [&](f32 min, f32 max, f32 origin, f32 dir) -> bool {
+    auto slab = [&](f32 min, f32 max, f32 origin, f32 dir) {
         f32 invDir = 1.0F / dir;
         f32 t0 = (min - origin) * invDir;
         f32 t1 = (max - origin) * invDir;
@@ -380,10 +378,10 @@ static constexpr bool intersect(
         Hit hit;
         bool isHit = std::visit(
             Overloaded {
-                [&](const Sphere& sphere) {
+                [&updatedRay, &hit](const Sphere& sphere) {
                     return intersect_sphere(sphere, updatedRay, hit);
                 },
-                [&](const Mesh& mesh) {
+                [&updatedRay, &hit](const Mesh& mesh) {
                     return intersect_mesh(mesh, updatedRay, hit);
                 }
             },
@@ -411,7 +409,7 @@ static constexpr Vec3<f32> offset_ray_origin(
     constexpr f32 ORIGIN = 1.0F / 32.0F;
     constexpr f32 FLOAT_SCALE = 1.0F / 65536.0F;
     constexpr f32 INT_SCALE = 256.0F;
-    auto offset = [](f32 p, f32 n) -> f32 {
+    auto offset = [](f32 p, f32 n) {
         i32 i = static_cast<i32>(INT_SCALE * n);
         i32 bits = std::bit_cast<i32>(p);
         f32 shifted = std::bit_cast<f32>(bits + ((p < 0.0F) ? -i : i));
@@ -422,6 +420,43 @@ static constexpr Vec3<f32> offset_ray_origin(
         offset(point.y, normal.y),
         offset(point.z, normal.z)
     };
+}
+
+/**
+ * @brief Computes the attenuation of light along a shadow ray.
+ *
+ * @param[in] objects   The objects to test for intersections.
+ * @param[in] shadowRay The shadow ray along which to compute the attenuation.
+ * @return The attenuation of light along the shadow ray.
+ */
+static constexpr Color shadow_attenuation(
+    std::span<const Object> objects,
+    Ray shadowRay
+) noexcept {
+    Color attenuation = { 1.0F, 1.0F, 1.0F };
+    for (isize i = 0; i < MAX_TRANSPARENCY_DEPTH; i++) {
+        Hit hit;
+        if (!intersect(objects, shadowRay, hit)) {
+            break;
+        }
+        const Material& material = hit.material;
+        if (!material.is_transparent()) {
+            attenuation = { 0.0F, 0.0F, 0.0F };
+            break;
+        }
+        attenuation *= material.albedo * material.transparency
+            + Color { 1.0F, 1.0F, 1.0F } * (1.0F - material.transparency);
+        if (attenuation.max() < EPS) {
+            attenuation = { 0.0F, 0.0F, 0.0F };
+            break;
+        }
+        shadowRay.origin = offset_ray_origin(
+            shadowRay.origin + hit.t * shadowRay.direction,
+            hit.normal
+        );
+        shadowRay.tMax -= hit.t;
+    }
+    return attenuation;
 }
 
 /**
@@ -449,7 +484,7 @@ static constexpr std::pair<Vec3<f32>, Vec3<f32>> orthonormal_basis(
  * @param[in, out] rng The pseudorandom number generator to draw from.
  * @return A point on the unit disk.
  */
-static Vec2<f32> sample_disk(Rng& rng) noexcept {
+static constexpr Vec2<f32> sample_disk(Rng& rng) noexcept {
     f32 r = std::sqrt(rng.next_f32());
     f32 theta = rng.next_f32() * 2.0F * PI;
     return { r * std::cos(theta), r * std::sin(theta) };
@@ -482,7 +517,7 @@ static constexpr Color fresnel_schlick(f32 cosTheta, const Color& f0) noexcept {
  * @param[in, out] rng      The pseudorandom number generator to draw from.
  * @return The local color at the point.
  */
-static Color local_color(
+static constexpr Color local_color(
     const Vec3<f32>& point,
     const Vec3<f32>& normal,
     const Vec3<f32>& viewDir,
@@ -490,44 +525,12 @@ static Color local_color(
     const Scene& scene,
     Rng& rng
 ) noexcept {
-    auto shadow_attenuation = [&](
-        const Vec3<f32>& lightDir,
-        f32 tMax
-    ) -> Color {
-        Color attenuation = { 1.0F, 1.0F, 1.0F };
-        Vec3<f32> origin = offset_ray_origin(point, normal);
-        for (isize i = 0; i < MAX_TRANSPARENCY_DEPTH; i++) {
-            Ray ray = { origin, lightDir, 0.0F, tMax };
-            Hit hit;
-            if (!intersect(scene.objects, ray, hit)) {
-                break;
-            }
-            f32 t = hit.t;
-            const Material& mat = hit.material;
-            if (!mat.is_transparent()) {
-                attenuation = { 0.0F, 0.0F, 0.0F };
-                break;
-            }
-            attenuation *= mat.albedo * mat.transparency
-                + Color { 1.0F, 1.0F, 1.0F } * (1.0F - mat.transparency);
-            if (attenuation.max() < EPS) {
-                attenuation = { 0.0F, 0.0F, 0.0F };
-                break;
-            }
-            origin = offset_ray_origin(
-                ray.origin + t * ray.direction,
-                hit.normal
-            );
-            tMax -= t;
-        }
-        return attenuation;
-    };
     f32 alpha = std::max(material.roughness * material.roughness, EPS);
     f32 alpha2 = alpha * alpha;
     f32 nDotV = std::max(normal.dot(viewDir), 0.0F);
     f32 k = (material.roughness + 1.0F) * (material.roughness + 1.0F) / 8.0F;
     f32 geometryV = nDotV / (nDotV * (1.0F - k) + k);
-    auto lighting = [&](const Vec3<f32>& lightDir) -> Color {
+    auto lighting = [&](const Vec3<f32>& lightDir) {
         Vec3<f32> halfDir = (viewDir + lightDir).normalize();
         f32 vDotH = std::max(viewDir.dot(halfDir), 0.0F);
         Color fresnel = fresnel_schlick(vDotH, material.f0);
@@ -556,7 +559,13 @@ static Color local_color(
         Vec3<f32> lightDir = lightPos - point;
         f32 distance = lightDir.norm();
         lightDir = lightDir.normalize();
-        Color shadow = shadow_attenuation(lightDir, distance);
+        Ray shadowRay = {
+            offset_ray_origin(point, lightDir),
+            lightDir,
+            0.0F,
+            distance
+        };
+        Color shadow = shadow_attenuation(scene.objects, shadowRay);
         if (shadow.max() > 0.0F) {
             f32 attenuation = 1.0F
                 / (light.kc + light.kl * distance
@@ -576,7 +585,13 @@ static Color local_color(
         Vec3<f32> lightDir = lightPos - point;
         f32 distance = lightDir.norm();
         lightDir = lightDir.normalize();
-        Color shadow = shadow_attenuation(lightDir, distance);
+        Ray shadowRay = {
+            offset_ray_origin(point, lightDir),
+            lightDir,
+            0.0F,
+            distance
+        };
+        Color shadow = shadow_attenuation(scene.objects, shadowRay);
         if (shadow.max() > 0.0F) {
             f32 cosTheta = (-lightDir).dot(light.direction);
             if (cosTheta <= light.outerCutoff) {
@@ -603,7 +618,13 @@ static Color local_color(
             lightDir = (lightDir + tangent * sample.x + bitangent * sample.y)
                 .normalize();
         }
-        Color shadow = shadow_attenuation(lightDir, INF);
+        Ray shadowRay = {
+            offset_ray_origin(point, lightDir),
+            lightDir,
+            0.0F,
+            INF
+        };
+        Color shadow = shadow_attenuation(scene.objects, shadowRay);
         if (shadow.max() > 0.0F) {
             local += lighting(lightDir) * light.color * light.intensity
                 * shadow;
@@ -760,8 +781,25 @@ static constexpr Color gamma_correct(const Color& color) noexcept {
     };
 }
 
-void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
+/**
+ * @brief Renders a single row on a canvas using raytracing.
+ *
+ * @warning The behavior is undefined if `samples` is not greater than zero, or
+ * if `y` is out of bounds.
+ *
+ * @param[in]  scene   The scene to render.
+ * @param[out] canvas  The canvas to render the scene to.
+ * @param[in]  samples The number of samples per pixel.
+ * @param[in]  y       The index of the row to render.
+ */
+static constexpr void render_row(
+    const Scene& scene,
+    Canvas& canvas,
+    isize samples,
+    isize y
+) noexcept {
     assert(samples > 0);
+    assert((y >= 0) && (y < canvas.height()));
     Vec2<f32> canvasSize = {
         static_cast<f32>(canvas.width()),
         static_cast<f32>(canvas.height())
@@ -770,55 +808,61 @@ void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
         scene.viewport.width / canvasSize.x,
         scene.viewport.height / canvasSize.y
     };
-    std::atomic<isize> nextY = 0;
-    auto render_row = [&]() -> void {
-        Rng rng(42);
-        isize y;
-        while (
-            (y = nextY.fetch_add(1, std::memory_order::relaxed))
-                < canvas.height()
-        ) {
-            for (isize x = 0; x < canvas.width(); x++) {
-                Color sum = { };
-                for (isize sy = 0; sy < samples; sy++) {
-                    for (isize sx = 0; sx < samples; sx++) {
-                        Vec3<f32> viewportPos = {
-                            (-canvasSize.x / 2.0F + static_cast<f32>(x)
-                                + (static_cast<f32>(sx) + 0.5F)
-                                    / static_cast<f32>(samples))
-                                * viewportScale.x,
-                            (canvasSize.y / 2.0F - 1.0F - static_cast<f32>(y)
-                                - (static_cast<f32>(sy) + 0.5F)
-                                    / static_cast<f32>(samples))
-                                * viewportScale.y,
-                            -scene.viewport.distance
-                        };
-                        Ray ray = {
-                            scene.camera.viewpoint,
-                            (scene.camera.rotation * viewportPos).normalize(),
-                            scene.viewport.distance,
-                            INF
-                        };
-                        IorStack iorStack;
-                        iorStack.push(1.0F);
-                        sum += trace_ray(scene, ray, rng, iorStack);
-                    }
-                }
-                Color avg = sum / static_cast<f32>(samples * samples);
-                Color color = gamma_correct(avg).clamp(0.0F, 1.0F);
-                Pixel pixel = {
-                    static_cast<u8>(color.r * 255.0F + 0.5F),
-                    static_cast<u8>(color.g * 255.0F + 0.5F),
-                    static_cast<u8>(color.b * 255.0F + 0.5F)
+    std::random_device device;
+    Rng rng(device());
+    for (isize x = 0; x < canvas.width(); x++) {
+        Color sum = { };
+        for (isize sy = 0; sy < samples; sy++) {
+            for (isize sx = 0; sx < samples; sx++) {
+                Vec3<f32> viewportPos = {
+                    (-canvasSize.x / 2.0F + static_cast<f32>(x)
+                        + (static_cast<f32>(sx) + 0.5F)
+                            / static_cast<f32>(samples))
+                        * viewportScale.x,
+                    (canvasSize.y / 2.0F - 1.0F - static_cast<f32>(y)
+                        - (static_cast<f32>(sy) + 0.5F)
+                            / static_cast<f32>(samples))
+                        * viewportScale.y,
+                    -scene.viewport.distance
                 };
-                canvas.put_pixel(x, y, pixel);
+                Ray ray = {
+                    scene.camera.viewpoint,
+                    (scene.camera.rotation * viewportPos).normalize(),
+                    scene.viewport.distance,
+                    INF
+                };
+                IorStack iorStack;
+                iorStack.push(1.0F);
+                sum += trace_ray(scene, ray, rng, iorStack);
             }
+        }
+        Color avg = sum / static_cast<f32>(samples * samples);
+        Color color = gamma_correct(avg).clamp(0.0F, 1.0F);
+        Pixel pixel = {
+            static_cast<u8>(color.r * 255.0F + 0.5F),
+            static_cast<u8>(color.g * 255.0F + 0.5F),
+            static_cast<u8>(color.b * 255.0F + 0.5F)
+        };
+        canvas.put_pixel(x, y, pixel);
+    }
+}
+
+void raytrace(const Scene& scene, Canvas& canvas, isize samples) {
+    assert(samples > 0);
+    std::atomic<isize> nextY = 0;
+    auto worker = [&scene, &canvas, samples, &nextY]() {
+        while (true) {
+            isize y = nextY.fetch_add(1, std::memory_order::relaxed);
+            if (y >= canvas.height()) {
+                break;
+            }
+            render_row(scene, canvas, samples, y);
         }
     };
     std::vector<std::jthread> threads;
     threads.reserve(MAX_THREADS);
     for (usize i = 0; i < MAX_THREADS; i++) {
-        threads.emplace_back(render_row);
+        threads.emplace_back(worker);
     }
 }
 

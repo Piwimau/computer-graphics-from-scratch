@@ -44,7 +44,7 @@ struct Camera {
             x.y, y.y, z.y,
             x.z, y.z, z.z
         };
-        return Camera(viewpoint, rotation);
+        return { viewpoint, rotation };
     }
 
     /**
