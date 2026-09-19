@@ -7,7 +7,7 @@
 
 namespace cgfs {
 
-/** @brief Represents a viewport which acts as window into a scene. */
+/** @brief Represents a viewport that acts as window into a scene. */
 struct Viewport {
 
     /** @brief The width of this viewport. */

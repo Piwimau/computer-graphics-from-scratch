@@ -51,10 +51,10 @@ struct SpotLight {
     /** @brief The radius of this light. */
     f32 radius;
 
-    /** @brief The cosine of the inner cone angle. */
+    /** @brief The cosine of the inner cone angle (in radians). */
     f32 innerCutoff;
 
-    /** @brief The cosine of the outer cone angle. */
+    /** @brief The cosine of the outer cone angle (in radians). */
     f32 outerCutoff;
 
     /** @brief The constant attenuation factor of this light. */

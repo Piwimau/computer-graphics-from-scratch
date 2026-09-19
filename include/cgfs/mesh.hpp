@@ -29,8 +29,7 @@ struct Mesh {
     Material material;
 
     /**
-     * @brief Creates a new mesh with the specified vertices, indices, and
-     * material.
+     * @brief Creates a mesh with the specified vertices, indices, and material.
      *
      * @warning The behavior is undefined if `vertices` contains fewer than
      * three elements, or if `indices` is not a multiple of three.
@@ -38,7 +37,7 @@ struct Mesh {
      * @param[in] vertices The vertices that make up the mesh.
      * @param[in] indices  The indices forming the triangles of the mesh.
      * @param[in] material The material of the mesh.
-     * @return A new mesh with the specified vertices, indices, and material.
+     * @return A mesh with the specified vertices, indices, and material.
      */
     static constexpr Mesh create(
         std::vector<Vec3<f32>> vertices,

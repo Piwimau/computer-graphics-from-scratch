@@ -1,7 +1,6 @@
 #ifndef CGFS_CANVAS_HPP
 #define CGFS_CANVAS_HPP
 
-#include <algorithm>
 #include <cassert>
 #include <span>
 #include <vector>
@@ -37,7 +36,7 @@ private:
     isize _height;
 
     /**
-     * @brief Initializes a new canvas with the specified properties.
+     * @brief Initializes a canvas with the specified properties.
      *
      * @warning The behavior is undefined if `pixels` does not have `width *
      * height` elements, or if `width` or `height` is negative.
@@ -51,7 +50,9 @@ private:
         isize width,
         isize height
     ) noexcept
-        : _pixels(std::move(pixels)), _width(width), _height(height) {
+        : _pixels(std::move(pixels)),
+          _width(width),
+          _height(height) {
         assert(_width >= 0);
         assert(_height >= 0);
         assert(std::ssize(_pixels) == width * height);

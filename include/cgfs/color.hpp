@@ -231,8 +231,8 @@ struct Color {
     /**
      * @brief Clamps the components of this color to a specified range.
      *
-     * @param[in] min The minimum value for each component.
-     * @param[in] max The maximum value for each component (inclusive).
+     * @param[in] min The minimum value.
+     * @param[in] max The maximum value (inclusive).
      * @return The clamped color.
      */
     constexpr Color clamp(f32 min, f32 max) const noexcept {
@@ -240,6 +240,21 @@ struct Color {
             std::clamp(r, min, max),
             std::clamp(g, min, max),
             std::clamp(b, min, max)
+        };
+    }
+
+    /**
+     * @brief Clamps the components of this color to a specified range.
+     *
+     * @param[in] min The minimum value for each component.
+     * @param[in] max The maximum value for each component (inclusive).
+     * @return The clamped color.
+     */
+    constexpr Color clamp(const Color& min, const Color& max) const noexcept {
+        return {
+            std::clamp(r, min.r, max.r),
+            std::clamp(g, min.g, max.g),
+            std::clamp(b, min.b, max.b)
         };
     }
 
@@ -260,7 +275,7 @@ struct Color {
     }
 
     /**
-     * @brief Linearly interpolates between two colors (component-wise).
+     * @brief Linearly interpolates between two colors.
      *
      * @param[in] a The color at `t = 0.0F`.
      * @param[in] b The color at `t = 1.0F`.

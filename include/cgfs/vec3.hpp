@@ -338,8 +338,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Clamps the components of this vector between a minimum and maximum
-     * value.
+     * @brief Clamps the components of this vector to a specified range.
      *
      * @param[in] min The minimum value.
      * @param[in] max The maximum value (inclusive).
@@ -354,11 +353,29 @@ struct Vec3 {
     }
 
     /**
+     * @brief Clamps the components of this vector to a specified range.
+     *
+     * @param[in] min The minimum values for each component.
+     * @param[in] max The maximum values for each component (inclusive).
+     * @return The clamped vector.
+     */
+    constexpr Vec3<T> clamp(
+        const Vec3<T>& min,
+        const Vec3<T>& max
+    ) const noexcept {
+        return {
+            std::clamp(x, min.x, max.x),
+            std::clamp(y, min.y, max.y),
+            std::clamp(z, min.z, max.z)
+        };
+    }
+
+    /**
      * @brief Computes the linear interpolation between two vectors.
      *
      * @param[in] a The vector at `t = 0.0`.
      * @param[in] b The vector at `t = 1.0`.
-     * @param[in] t The interpolation parameter in the range `[0.0, 1.0]`.
+     * @param[in] t The interpolation factor in the range `[0.0, 1.0]`.
      * @return The interpolated vector.
      */
     static constexpr Vec3<T> lerp(
@@ -367,6 +384,23 @@ struct Vec3 {
         T t
     ) noexcept requires std::floating_point<T> {
         return a * (static_cast<T>(1) - t) + b * t;
+    }
+
+    /**
+     * @brief Computes the linear interpolation between two vectors.
+     *
+     * @param[in] a The vector at `t = 0.0`.
+     * @param[in] b The vector at `t = 1.0`.
+     * @param[in] t The interpolation factor for each component in the range
+     *              `[0.0, 1.0]`.
+     * @return The interpolated vector.
+     */
+    static constexpr Vec3<T> lerp(
+        const Vec3<T>& a,
+        const Vec3<T>& b,
+        const Vec3<T>& t
+    ) noexcept requires std::floating_point<T> {
+        return a * (Vec3<T> { 1, 1, 1 } - t) + b * t;
     }
 
 };

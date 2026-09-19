@@ -33,11 +33,11 @@ private:
 
 public:
 
-    /** @brief Initializes a new matrix with all elements set to zero. */
+    /** @brief Initializes a matrix with all elements set to zero. */
     constexpr Mat2() noexcept : _elems({ }) { }
 
     /**
-     * @brief Initializes a new matrix with the specified elements.
+     * @brief Initializes a matrix with the specified elements.
      *
      * @note The elements must be specified in row-major order.
      *
@@ -50,7 +50,7 @@ public:
         : _elems({ e00, e01, e10, e11 }) { }
 
     /**
-     * @brief Initializes a new matrix with the specified elements.
+     * @brief Initializes a matrix with the specified elements.
      *
      * @note The elements must be specified in row-major order.
      *

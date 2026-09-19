@@ -94,13 +94,12 @@ public:
     }
 
     /**
-     * @brief Enters a new medium by pushing its refractive index onto this
-     * stack.
+     * @brief Enters a medium by pushing its refractive index onto this stack.
      *
      * @warning The behavior is undefined if this stack is full, or if `ior` is
      * not greater than zero.
      *
-     * @param[in] ior The refractive index of the new medium.
+     * @param[in] ior The refractive index of the entered medium.
      */
     constexpr void push(f32 ior) noexcept {
         assert(_size < std::ssize(_iors));
@@ -155,8 +154,7 @@ private:
 public:
 
     /**
-     * @brief Initializes a new pseudorandom number generator with a specified
-     * seed.
+     * @brief Initializes a pseudorandom number generator with a specified seed.
      *
      * @param[in] seed The seed for the initialization.
      */
@@ -899,8 +897,8 @@ static constexpr void render_row(
                     -scene.viewport.distance
                 };
                 Ray ray = {
-                    scene.camera.viewpoint,
-                    (scene.camera.rotation * viewportPos).normalize(),
+                    scene.camera.position(),
+                    (scene.camera.rotation() * viewportPos).normalize(),
                     scene.viewport.distance,
                     INF
                 };
