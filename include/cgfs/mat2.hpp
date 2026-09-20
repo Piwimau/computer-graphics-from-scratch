@@ -5,7 +5,6 @@
 #include <cassert>
 #include <concepts>
 #include <span>
-#include "cgfs/numeric.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec2.hpp"
 
@@ -16,7 +15,7 @@ namespace cgfs {
  *
  * @tparam T The type of the elements in the matrix.
  */
-template<Numeric T>
+template<std::floating_point T>
 class Mat2 final {
 public:
 
@@ -234,7 +233,7 @@ public:
      *
      * @return The inverse of this matrix.
      */
-    constexpr Mat2<T> inverse() const noexcept requires std::floating_point<T> {
+    constexpr Mat2<T> inverse() const noexcept {
         T det = determinant();
         T invDet = static_cast<T>(1) / det;
         const Mat2<T>& m = *this;

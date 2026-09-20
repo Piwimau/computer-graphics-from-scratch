@@ -435,7 +435,7 @@ static constexpr Vec3<f32> offset_ray_origin(
 }
 
 /**
- * @brief Computes an orthonormal basis around a normal.
+ * @brief Returns an orthonormal basis around a normal.
  *
  * @param[in] normal The normal around which to compute the basis (normalized).
  * @return A pair containing the tangent and bitangent forming an orthonormal
@@ -502,7 +502,7 @@ static constexpr Vec3<f32> sample_hemisphere(
 }
 
 /**
- * @brief Computes the Fresnel reflectance using the Schlick approximation.
+ * @brief Returns the Fresnel reflectance using the Schlick approximation.
  *
  * @param[in] cosTheta The cosine of the angle between the view/light direction
  *                     and the half-vector (or normal).
@@ -516,7 +516,7 @@ static constexpr Color fresnel_schlick(f32 cosTheta, const Color& f0) noexcept {
 }
 
 /**
- * @brief Computes the local color at a point on a surface, accounting for the
+ * @brief Returns the local color at a point on a surface, accounting for the
  * material properties, lights, and other objects in the scene.
  *
  * @param[in]      point    The point to compute the local color for.
@@ -689,7 +689,7 @@ static constexpr std::optional<f32> russian_roulette(
 }
 
 /**
- * @brief Computes the Beer-Lambert attenuation of light traveling through an
+ * @brief Returns the Beer-Lambert attenuation of light traveling through an
  * absorptive medium.
  *
  * @param[in] absorption The absorption coefficients of the medium.

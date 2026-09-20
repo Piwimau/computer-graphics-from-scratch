@@ -5,7 +5,6 @@
 #include <cmath>
 #include <concepts>
 #include <optional>
-#include "cgfs/numeric.hpp"
 
 namespace cgfs {
 
@@ -14,7 +13,7 @@ namespace cgfs {
  *
  * @tparam T The type of the vector's components.
  */
-template<Numeric T>
+template<std::floating_point T>
 struct Vec3 {
 
     /** @brief The x-component of this vector. */
@@ -210,7 +209,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the dot product of this vector and another vector.
+     * @brief Returns the dot product of this vector and another vector.
      *
      * @param[in] rhs The other vector.
      * @return The dot product of this vector and the other vector.
@@ -220,7 +219,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the cross product of this vector and another vector.
+     * @brief Returns the cross product of this vector and another vector.
      *
      * @param[in] rhs The other vector.
      * @return The cross product of this vector and the other vector.
@@ -234,7 +233,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the euclidean norm (or magnitude) of this vector.
+     * @brief Returns the euclidean norm (or magnitude) of this vector.
      *
      * @return The euclidean norm (or magnitude) of this vector.
      */
@@ -243,19 +242,18 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the angle between this vector and another vector (in
+     * @brief Returns the angle between this vector and another vector (in
      * radians).
      *
      * @param[in] rhs The other vector.
      * @return The angle between this vector and the other vector (in radians).
      */
-    constexpr T angle(const Vec3<T>& rhs) const noexcept
-        requires std::floating_point<T> {
+    constexpr T angle(const Vec3<T>& rhs) const noexcept {
         return std::acos(dot(rhs) / (norm() * rhs.norm()));
     }
 
     /**
-     * @brief Computes the normalized (unit) vector of this vector.
+     * @brief Returns the normalized (unit) vector of this vector.
      *
      * @return The normalized (unit) vector of this vector.
      */
@@ -265,7 +263,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the reflection of this vector around a surface normal.
+     * @brief Returns the reflection of this vector around a surface normal.
      *
      * @param[in] normal The surface normal to reflect around.
      * @return The reflected vector.
@@ -275,7 +273,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the refraction of this vector through a surface with a
+     * @brief Returns the refraction of this vector through a surface with a
      * specified normal and refractive index ratio using Snell's law.
      *
      * @param[in] normal The surface normal to refract through.
@@ -287,7 +285,7 @@ struct Vec3 {
     constexpr std::optional<Vec3<T>> refract(
         const Vec3<T>& normal,
         T eta
-    ) const noexcept requires std::floating_point<T> {
+    ) const noexcept {
         T cosThetaI = -normal.dot(*this);
         T sin2ThetaI = eta * eta * (static_cast<T>(1) - cosThetaI * cosThetaI);
         if (sin2ThetaI > static_cast<T>(1)) {
@@ -371,7 +369,7 @@ struct Vec3 {
     }
 
     /**
-     * @brief Computes the linear interpolation between two vectors.
+     * @brief Linearly interpolates between two vectors.
      *
      * @param[in] a The vector at `t = 0.0`.
      * @param[in] b The vector at `t = 1.0`.
@@ -382,12 +380,12 @@ struct Vec3 {
         const Vec3<T>& a,
         const Vec3<T>& b,
         T t
-    ) noexcept requires std::floating_point<T> {
+    ) noexcept {
         return a * (static_cast<T>(1) - t) + b * t;
     }
 
     /**
-     * @brief Computes the linear interpolation between two vectors.
+     * @brief Linearly interpolates between two vectors.
      *
      * @param[in] a The vector at `t = 0.0`.
      * @param[in] b The vector at `t = 1.0`.
@@ -399,7 +397,7 @@ struct Vec3 {
         const Vec3<T>& a,
         const Vec3<T>& b,
         const Vec3<T>& t
-    ) noexcept requires std::floating_point<T> {
+    ) noexcept {
         return a * (Vec3<T> { 1, 1, 1 } - t) + b * t;
     }
 
