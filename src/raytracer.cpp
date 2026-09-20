@@ -210,6 +210,9 @@ static constexpr f32 EPS = 1.0E-6F;
 /** @brief The background color used when no objects are intersected. */
 static constexpr Color BACKGROUND_COLOR = { 0.0F, 0.0F, 0.0F };
 
+/** @brief The minimum roughness for the GGX microfacet model. */
+static constexpr f32 MIN_GGX_ROUGHNESS = 0.05F;
+
 /**
  * @brief The maximum depth for determining the shadow attenuation through
  * transparent objects.
@@ -565,14 +568,18 @@ static constexpr Color local_color(
         Color diffuse = material.albedo / PI
             * (Color { 1.0F, 1.0F, 1.0F } - fresnel)
             * (1.0F - material.metalness) * (1.0F - material.transparency);
-        f32 nDotH = std::max(normal.dot(halfDir), 0.0F);
-        f32 denom = nDotH * nDotH * (alpha2 - 1.0F) + 1.0F;
-        f32 distribution = alpha2 / (PI * denom * denom);
+        Color specular = { 0.0F, 0.0F, 0.0F };
         f32 nDotL = std::max(normal.dot(lightDir), 0.0F);
-        f32 geometryL = nDotL / (nDotL * (1.0F - k) + k);
-        f32 geometry = geometryV * geometryL;
-        Color specular = fresnel
-            * (distribution * geometry / std::max(4.0F * nDotV * nDotL, EPS));
+        if (material.roughness >= MIN_GGX_ROUGHNESS) {
+            f32 nDotH = std::max(normal.dot(halfDir), 0.0F);
+            f32 denom = nDotH * nDotH * (alpha2 - 1.0F) + 1.0F;
+            f32 distribution = alpha2 / (PI * denom * denom);
+            f32 geometryL = nDotL / (nDotL * (1.0F - k) + k);
+            f32 geometry = geometryV * geometryL;
+            specular = fresnel
+                * (distribution * geometry
+                   / std::max(4.0F * nDotV * nDotL, EPS));
+        }
         return (diffuse + specular) * nDotL;
     };
     auto distance_attenuation = [](const auto& light, f32 distance) {
