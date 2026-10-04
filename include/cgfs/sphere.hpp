@@ -7,16 +7,16 @@
 
 namespace cgfs {
 
-/** @brief Represents a sphere. */
+/** @brief A sphere. */
 struct Sphere {
 
-    /** @brief The center of this sphere. */
+    /** @brief The center in world space. */
     Vec3<f32> center;
 
-    /** @brief The radius of this sphere. */
+    /** @brief The radius. */
     f32 radius;
 
-    /** @brief The material of this sphere. */
+    /** @brief The surface material. */
     Material material;
 
 };

@@ -9,36 +9,36 @@
 namespace cgfs {
 
 /**
- * @brief Represents a quaternion.
+ * @brief A quaternion.
  *
- * @tparam T The type of the quaternion's components.
+ * @tparam T The type of the components.
  */
 template<std::floating_point T>
 struct Quat {
 
-    /** @brief The x-component of this quaternion. */
+    /** @brief The x-component. */
     T x;
 
-    /** @brief The y-component of this quaternion. */
+    /** @brief The y-component. */
     T y;
 
-    /** @brief The z-component of this quaternion. */
+    /** @brief The z-component. */
     T z;
 
-    /** @brief The w-component of this quaternion. */
+    /** @brief The w-component. */
     T w;
 
     /**
-     * @brief Returns the identity quaternion.
+     * @brief Constructs an identity quaternion.
      *
-     * @return The identity quaternion.
+     * @return An identity quaternion.
      */
     static constexpr Quat<T> identity() noexcept {
-        return { 0, 0, 0, 1 };
+        return { .x = 0, .y = 0, .z = 0, .w = 1 };
     }
 
     /**
-     * @brief Creates a quaternion from an axis and angle of rotation.
+     * @brief Constructs a quaternion from an axis and angle of rotation.
      *
      * @param[in] axis  The axis of rotation.
      * @param[in] angle The angle of rotation (in radians).
@@ -51,11 +51,11 @@ struct Quat {
     ) noexcept {
         T halfAngle = angle * static_cast<T>(0.5);
         Vec3<T> v = axis.normalize() * std::sin(halfAngle);
-        return { v.x, v.y, v.z, std::cos(halfAngle) };
+        return { .x = v.x, .y = v.y, .z = v.z, .w = std::cos(halfAngle) };
     }
 
     /**
-     * @brief Creates a quaternion from a 3x3 rotation matrix.
+     * @brief Constructs a quaternion from a 3x3 rotation matrix.
      *
      * @param[in] m The rotation matrix.
      * @return A quaternion representing the rotation described by the matrix.
@@ -65,39 +65,39 @@ struct Quat {
         if (trace >= static_cast<T>(0)) {
             T s = std::sqrt(trace + static_cast<T>(1)) * static_cast<T>(2);
             return {
-                (m[2][1] - m[1][2]) / s,
-                (m[0][2] - m[2][0]) / s,
-                (m[1][0] - m[0][1]) / s,
-                static_cast<T>(0.25) * s
+                .x = (m[2][1] - m[1][2]) / s,
+                .y = (m[0][2] - m[2][0]) / s,
+                .z = (m[1][0] - m[0][1]) / s,
+                .w = static_cast<T>(0.25) * s
             };
         }
         if ((m[0][0] >= m[1][1]) && (m[0][0] >= m[2][2])) {
             T s = std::sqrt(static_cast<T>(1) + m[0][0] - m[1][1] - m[2][2])
                 * static_cast<T>(2);
             return {
-                static_cast<T>(0.25) * s,
-                (m[0][1] + m[1][0]) / s,
-                (m[0][2] + m[2][0]) / s,
-                (m[2][1] - m[1][2]) / s
+                .x = static_cast<T>(0.25) * s,
+                .y = (m[0][1] + m[1][0]) / s,
+                .z = (m[0][2] + m[2][0]) / s,
+                .w = (m[2][1] - m[1][2]) / s
             };
         }
         if (m[1][1] >= m[2][2]) {
             T s = std::sqrt(static_cast<T>(1) + m[1][1] - m[0][0] - m[2][2])
                 * static_cast<T>(2);
             return {
-                (m[0][1] + m[1][0]) / s,
-                static_cast<T>(0.25) * s,
-                (m[1][2] + m[2][1]) / s,
-                (m[0][2] - m[2][0]) / s
+                .x = (m[0][1] + m[1][0]) / s,
+                .y = static_cast<T>(0.25) * s,
+                .z = (m[1][2] + m[2][1]) / s,
+                .w = (m[0][2] - m[2][0]) / s
             };
         }
         T s = std::sqrt(static_cast<T>(1) + m[2][2] - m[0][0] - m[1][1])
             * static_cast<T>(2);
         return {
-            (m[0][2] + m[2][0]) / s,
-            (m[1][2] + m[2][1]) / s,
-            static_cast<T>(0.25) * s,
-            (m[1][0] - m[0][1]) / s
+            .x = (m[0][2] + m[2][0]) / s,
+            .y = (m[1][2] + m[2][1]) / s,
+            .z = static_cast<T>(0.25) * s,
+            .w = (m[1][0] - m[0][1]) / s
         };
     }
 
@@ -105,7 +105,7 @@ struct Quat {
      * @brief Adds a quaternion to this quaternion (component-wise).
      *
      * @param[in] rhs The quaternion to add.
-     * @return A reference to this quaternion after the addition.
+     * @return A reference to this quaternion.
      */
     constexpr Quat<T>& operator+=(const Quat<T>& rhs) noexcept {
         x += rhs.x;
@@ -134,7 +134,7 @@ struct Quat {
      * @brief Subtracts a quaternion from this quaternion (component-wise).
      *
      * @param[in] rhs The quaternion to subtract.
-     * @return A reference to this quaternion after the subtraction.
+     * @return A reference to this quaternion.
      */
     constexpr Quat<T>& operator-=(const Quat<T>& rhs) noexcept {
         x -= rhs.x;
@@ -162,13 +162,13 @@ struct Quat {
     /**
      * @brief Multiplies this quaternion by another quaternion.
      *
+     * @param[in] rhs The quaternion to multiply by.
+     * @return A reference to this quaternion.
+     *
      * @note This is the standard multiplication of two quaternions (also known
      * as the Hamilton product), not a component-wise one. Similar to matrix
      * multiplication, the order is reversed (i.e., the rotation of `rhs` is
      * applied first, followed by the rotation of `*this`).
-     *
-     * @param[in] rhs The quaternion to multiply by.
-     * @return A reference to this quaternion after the multiplication.
      */
     constexpr Quat<T>& operator*=(const Quat<T>& rhs) noexcept {
         Vec3<T> v0 = imag();
@@ -186,14 +186,14 @@ struct Quat {
     /**
      * @brief Multiplies two quaternions.
      *
+     * @param[in] lhs The quaternion to multiply.
+     * @param[in] rhs The quaternion to multiply by.
+     * @return The result of multiplying the two quaternions.
+     *
      * @note This is the standard multiplication of two quaternions (also known
      * as the Hamilton product), not a component-wise one. Similar to matrix
      * multiplication, the order is reversed (i.e., the rotation of `rhs` is
      * applied first, followed by the rotation of `lhs`).
-     *
-     * @param[in] lhs The quaternion to multiply.
-     * @param[in] rhs The quaternion to multiply by.
-     * @return The result of multiplying the two quaternions.
      */
     friend constexpr Quat<T> operator*(
         Quat<T> lhs,
@@ -218,7 +218,7 @@ struct Quat {
      * @return The imaginary part of this quaternion.
      */
     constexpr Vec3<T> imag() const noexcept {
-        return { x, y, z };
+        return { .x = x, .y = y, .z = z };
     }
 
     /**
@@ -265,7 +265,7 @@ struct Quat {
      */
     constexpr Quat<T> normalize() const noexcept {
         T n = norm();
-        return { x / n, y / n, z / n, w / n };
+        return { .x = x / n, .y = y / n, .z = z / n, .w = w / n };
     }
 
     /**
@@ -274,7 +274,7 @@ struct Quat {
      * @return The conjugate of this quaternion.
      */
     constexpr Quat<T> conjugate() const noexcept {
-        return { -x, -y, -z, w };
+        return { .x = -x, .y = -y, .z = -z, .w = w };
     }
 
     /**
@@ -286,10 +286,10 @@ struct Quat {
         Quat<T> conj = conjugate();
         T invNorm2 = static_cast<T>(1) / dot(*this);
         return {
-            conj.x * invNorm2,
-            conj.y * invNorm2,
-            conj.z * invNorm2,
-            conj.w * invNorm2
+            .x = conj.x * invNorm2,
+            .y = conj.y * invNorm2,
+            .z = conj.z * invNorm2,
+            .w = conj.w * invNorm2
         };
     }
 
@@ -333,23 +333,23 @@ struct Quat {
     /**
      * @brief Linearly interpolates between two quaternions.
      *
-     * @param[in] a The quaternion at `t = 0.0`.
-     * @param[in] b The quaternion at `t = 1.0`.
-     * @param[in] t The interpolation factor in the range `[0.0, 1.0]`.
+     * @param[in] lhs The quaternion at `t = 0.0`.
+     * @param[in] rhs The quaternion at `t = 1.0`.
+     * @param[in] t   The interpolation factor in the range `[0.0, 1.0]`.
      * @return The interpolated quaternion.
      */
     static constexpr Quat<T> lerp(
-        const Quat<T>& a,
-        const Quat<T>& b,
+        const Quat<T>& lhs,
+        const Quat<T>& rhs,
         T t
     ) noexcept {
-        Quat<T> na = a.normalize();
-        Quat<T> nb = b.normalize();
+        Quat<T> nl = lhs.normalize();
+        Quat<T> nr = rhs.normalize();
         Quat<T> result = {
-            na.x * (static_cast<T>(1) - t) + nb.x * t,
-            na.y * (static_cast<T>(1) - t) + nb.y * t,
-            na.z * (static_cast<T>(1) - t) + nb.z * t,
-            na.w * (static_cast<T>(1) - t) + nb.w * t
+            .x = nl.x * (static_cast<T>(1) - t) + nr.x * t,
+            .y = nl.y * (static_cast<T>(1) - t) + nr.y * t,
+            .z = nl.z * (static_cast<T>(1) - t) + nr.z * t,
+            .w = nl.w * (static_cast<T>(1) - t) + nr.w * t
         };
         return result.normalize();
     }
@@ -357,39 +357,39 @@ struct Quat {
     /**
      * @brief Spherically interpolates between two quaternions.
      *
-     * @param[in] a The quaternion at `t = 0.0`.
-     * @param[in] b The quaternion at `t = 1.0`.
-     * @param[in] t The interpolation factor in the range `[0.0, 1.0]`.
+     * @param[in] lhs The quaternion at `t = 0.0`.
+     * @param[in] rhs The quaternion at `t = 1.0`.
+     * @param[in] t   The interpolation factor in the range `[0.0, 1.0]`.
      * @return The interpolated quaternion.
      */
     static constexpr Quat<T> slerp(
-        const Quat<T>& a,
-        const Quat<T>& b,
+        const Quat<T>& lhs,
+        const Quat<T>& rhs,
         T t
     ) noexcept {
-        Quat<T> na = a.normalize();
-        Quat<T> nb = b.normalize();
-        T cosTheta = na.dot(nb);
+        Quat<T> nl = lhs.normalize();
+        Quat<T> nr = rhs.normalize();
+        T cosTheta = nl.dot(nr);
         if (std::abs(cosTheta) >= static_cast<T>(1)) {
-            return na;
+            return nl;
         }
-        Quat<T> c = nb;
+        Quat<T> temp = nr;
         if (cosTheta < static_cast<T>(0)) {
             cosTheta = -cosTheta;
-            c = { -nb.x, -nb.y, -nb.z, -nb.w };
+            temp = { -nr.x, -nr.y, -nr.z, -nr.w };
         }
         T sinTheta = std::sqrt(static_cast<T>(1) - cosTheta * cosTheta);
         if (sinTheta < static_cast<T>(0.001)) {
-            return lerp(na, c, t);
+            return lerp(nl, temp, t);
         }
         T theta = std::acos(cosTheta);
-        T wa = std::sin((static_cast<T>(1) - t) * theta) / sinTheta;
-        T wb = std::sin(t * theta) / sinTheta;
+        T wl = std::sin((static_cast<T>(1) - t) * theta) / sinTheta;
+        T wr = std::sin(t * theta) / sinTheta;
         return {
-            na.x * wa + c.x * wb,
-            na.y * wa + c.y * wb,
-            na.z * wa + c.z * wb,
-            na.w * wa + c.w * wb
+            .x = nl.x * wl + temp.x * wr,
+            .y = nl.y * wl + temp.y * wr,
+            .z = nl.z * wl + temp.z * wr,
+            .w = nl.w * wl + temp.w * wr
         };
     }
 

@@ -11,34 +11,32 @@
 namespace cgfs {
 
 /**
- * @brief Represents a 3x3 matrix.
+ * @brief A 3x3 matrix.
  *
- * @tparam T The type of the elements in the matrix.
+ * @tparam T The type of the elements.
  */
 template<std::floating_point T>
 class Mat3 final {
 public:
 
-    /** @brief The number of rows in this matrix. */
+    /** @brief The number of rows. */
     static constexpr isize ROWS = 3;
 
-    /** @brief The number of columns in this matrix. */
+    /** @brief The number of columns. */
     static constexpr isize COLS = 3;
 
 private:
 
-    /** @brief The elements of this matrix. */
+    /** @brief The elements. */
     std::array<T, ROWS * COLS> _elems;
 
 public:
 
-    /** @brief Initializes a matrix with all elements set to zero. */
+    /** @brief Constructs a matrix with all elements set to zero. */
     constexpr Mat3() noexcept : _elems({ }) { }
 
     /**
-     * @brief Initializes a matrix with the specified elements.
-     *
-     * @note The elements must be specified in row-major order.
+     * @brief Constructs a matrix with the specified elements.
      *
      * @param[in] e00 The element at row `0` and column `0`.
      * @param[in] e01 The element at row `0` and column `1`.
@@ -49,6 +47,8 @@ public:
      * @param[in] e20 The element at row `2` and column `0`.
      * @param[in] e21 The element at row `2` and column `1`.
      * @param[in] e22 The element at row `2` and column `2`.
+     *
+     * @note The elements must be specified in row-major order.
      */
     constexpr Mat3(
         T e00,
@@ -64,19 +64,19 @@ public:
         : _elems({ e00, e01, e02, e10, e11, e12, e20, e21, e22 }) { }
 
     /**
-     * @brief Initializes a matrix with the specified elements.
-     *
-     * @note The elements must be specified in row-major order.
+     * @brief Constructs a matrix with the specified elements.
      *
      * @param[in] elems The elements of the matrix.
+     *
+     * @note The elements must be specified in row-major order.
      */
     constexpr Mat3(std::span<const T, ROWS * COLS> elems) noexcept
         : _elems(elems) { }
 
     /**
-     * @brief Returns the identity matrix.
+     * @brief Constructs an identity matrix.
      *
-     * @return The identity matrix.
+     * @return An identity matrix.
      */
     static constexpr Mat3<T> identity() noexcept {
         return {
@@ -112,7 +112,7 @@ public:
      * @brief Multiplies this matrix by a scalar.
      *
      * @param[in] rhs The scalar to multiply by.
-     * @return A reference to this matrix after the multiplication.
+     * @return A reference to this matrix.
      */
     constexpr Mat3<T>& operator*=(T rhs) noexcept {
         for (isize i = 0; i < ROWS; i++) {
@@ -169,7 +169,7 @@ public:
      * @brief Multiplies this matrix by another matrix.
      *
      * @param[in] rhs The matrix to multiply by.
-     * @return A reference to this matrix after the multiplication.
+     * @return A reference to this matrix.
      */
     constexpr Mat3<T>& operator*=(const Mat3<T>& rhs) noexcept {
         Mat3<T> result;
@@ -247,10 +247,10 @@ public:
     /**
      * @brief Returns the inverse of this matrix.
      *
-     * @warning The behavior is undefined if the matrix is not invertible (i.e.,
-     * its determinant is zero).
-     *
      * @return The inverse of this matrix.
+     *
+     * @warning The behavior is undefined if this matrix is not invertible
+     * (i.e., its determinant is zero).
      */
     constexpr Mat3<T> inverse() const noexcept {
         T det = determinant();
@@ -272,10 +272,10 @@ public:
     /**
      * @brief Returns the trace of this matrix.
      *
+     * @return The trace of this matrix.
+     *
      * @note The trace of a matrix is the sum of the elements on its main
      * diagonal (from the top-left to the bottom-right).
-     *
-     * @return The trace of this matrix.
      */
     constexpr T trace() const noexcept {
         return (*this)[0][0] + (*this)[1][1] + (*this)[2][2];

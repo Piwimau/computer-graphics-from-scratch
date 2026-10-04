@@ -49,23 +49,10 @@ endif
 deps += cpp.find_library('m', required: false)
 
 incs = include_directories('include')
+srcs = files('src/pathtracer.cpp')
 
-srcs = files('src/ppm.cpp', 'src/raytracer.cpp')
-
-cgfs_lib = library(
-    'cgfs',
-    srcs,
-    include_directories: incs,
-    dependencies: deps,
-    install: true,
-)
-
-install_subdir('include/cgfs', install_dir: 'include')
-
+cgfs_lib = library('cgfs', srcs, include_directories: incs, dependencies: deps)
 cgfs_dep = declare_dependency(include_directories: incs, link_with: cgfs_lib)
-
-pkg = import('pkgconfig')
-pkg.generate(cgfs_lib)
 
 if get_option('examples')
     subdir('examples')

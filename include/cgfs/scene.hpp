@@ -1,36 +1,21 @@
 #ifndef CGFS_SCENE_HPP
 #define CGFS_SCENE_HPP
 
-#include <variant>
 #include <vector>
 #include "cgfs/camera.hpp"
 #include "cgfs/light.hpp"
-#include "cgfs/mesh.hpp"
 #include "cgfs/sphere.hpp"
-#include "cgfs/viewport.hpp"
 
 namespace cgfs {
 
-/** @brief Represents an object in a scene. */
-using Object = std::variant<Sphere, Mesh>;
-
-/** @brief Represents a scene to render. */
+/** @brief A scene containing spheres, lights, and a camera. */
 struct Scene {
 
-    /** @brief The objects that make up this scene. */
-    std::vector<Object> objects;
+    /** @brief The spheres positioned in this scene. */
+    std::vector<Sphere> spheres;
 
-    /** @brief The point lights illuminating this scene. */
-    std::vector<PointLight> pointLights;
-
-    /** @brief The spot lights illuminating this scene. */
-    std::vector<SpotLight> spotLights;
-
-    /** @brief The directional lights illuminating this scene. */
-    std::vector<DirectionalLight> directionalLights;
-
-    /** @brief The viewport through which this scene is rendered. */
-    Viewport viewport;
+    /** @brief The lights illuminating this scene. */
+    std::vector<Light> lights;
 
     /** @brief The camera through which this scene is viewed. */
     Camera camera;

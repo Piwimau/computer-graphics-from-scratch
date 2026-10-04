@@ -9,27 +9,70 @@
 namespace cgfs {
 
 /**
- * @brief Represents a three-dimensional vector.
+ * @brief A three-dimensional vector.
  *
- * @tparam T The type of the vector's components.
+ * @tparam T The type of the components.
  */
 template<std::floating_point T>
 struct Vec3 {
 
-    /** @brief The x-component of this vector. */
+    /** @brief The x-component. */
     T x;
 
-    /** @brief The y-component of this vector. */
+    /** @brief The y-component. */
     T y;
 
-    /** @brief The z-component of this vector. */
+    /** @brief The z-component. */
     T z;
+
+    /**
+     * @brief Constructs a vector with all components set to a specified value.
+     *
+     * @param[in] value The value for all components.
+     * @return A vector with all components set to the specified value.
+     */
+    static constexpr Vec3<T> splat(T value) noexcept {
+        return { .x = value, .y = value, .z = value };
+    }
+
+    /**
+     * @brief Linearly interpolates between two vectors.
+     *
+     * @param[in] lhs The vector at `t = 0.0`.
+     * @param[in] rhs The vector at `t = 1.0`.
+     * @param[in] t   The interpolation factor in the range `[0.0, 1.0]`.
+     * @return The interpolated vector.
+     */
+    static constexpr Vec3<T> lerp(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs,
+        T t
+    ) noexcept {
+        return lhs * (static_cast<T>(1) - t) + rhs * t;
+    }
+
+    /**
+     * @brief Linearly interpolates between two vectors.
+     *
+     * @param[in] lhs The vector at `t = 0.0`.
+     * @param[in] rhs The vector at `t = 1.0`.
+     * @param[in] t   The interpolation factors for the components in the range
+     *                `[0.0, 1.0]`.
+     * @return The interpolated vector.
+     */
+    static constexpr Vec3<T> lerp(
+        const Vec3<T>& lhs,
+        const Vec3<T>& rhs,
+        const Vec3<T>& t
+    ) noexcept {
+        return lhs * (Vec3<T>::splat(1) - t) + rhs * t;
+    }
 
     /**
      * @brief Adds a vector to this vector (component-wise).
      *
      * @param[in] rhs The vector to add.
-     * @return A reference to this vector after the addition.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator+=(const Vec3<T>& rhs) noexcept {
         x += rhs.x;
@@ -57,7 +100,7 @@ struct Vec3 {
      * @brief Subtracts a vector from this vector (component-wise).
      *
      * @param[in] rhs The vector to subtract.
-     * @return A reference to this vector after the subtraction.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator-=(const Vec3<T>& rhs) noexcept {
         x -= rhs.x;
@@ -87,14 +130,14 @@ struct Vec3 {
      * @return The negation of this vector.
      */
     constexpr Vec3<T> operator-() const noexcept {
-        return { -x, -y, -z };
+        return { .x = -x, .y = -y, .z = -z };
     }
 
     /**
      * @brief Multiplies this vector by a scalar (component-wise).
      *
      * @param[in] rhs The scalar to multiply by.
-     * @return A reference to this vector after the multiplication.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator*=(T rhs) noexcept {
         x *= rhs;
@@ -131,7 +174,7 @@ struct Vec3 {
      * @brief Multiplies this vector by another vector (component-wise).
      *
      * @param[in] rhs The vector to multiply by.
-     * @return A reference to this vector after the multiplication.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator*=(const Vec3<T>& rhs) noexcept {
         x *= rhs.x;
@@ -159,7 +202,7 @@ struct Vec3 {
      * @brief Divides this vector by a scalar (component-wise).
      *
      * @param[in] rhs The scalar to divide by.
-     * @return A reference to this vector after the division.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator/=(T rhs) noexcept {
         x /= rhs;
@@ -184,7 +227,7 @@ struct Vec3 {
      * @brief Divides this vector by another vector (component-wise).
      *
      * @param[in] rhs The vector to divide by.
-     * @return A reference to this vector after the division.
+     * @return A reference to this vector.
      */
     constexpr Vec3<T>& operator/=(const Vec3<T>& rhs) noexcept {
         x /= rhs.x;
@@ -226,9 +269,9 @@ struct Vec3 {
      */
     constexpr Vec3<T> cross(const Vec3<T>& rhs) const noexcept {
         return {
-            y * rhs.z - z * rhs.y,
-            z * rhs.x - x * rhs.z,
-            x * rhs.y - y * rhs.x
+            .x = y * rhs.z - z * rhs.y,
+            .y = z * rhs.x - x * rhs.z,
+            .z = x * rhs.y - y * rhs.x
         };
     }
 
@@ -259,7 +302,7 @@ struct Vec3 {
      */
     constexpr Vec3<T> normalize() const noexcept {
         T n = norm();
-        return { x / n, y / n, z / n };
+        return { .x = x / n, .y = y / n, .z = z / n };
     }
 
     /**
@@ -305,14 +348,18 @@ struct Vec3 {
     }
 
     /**
-     * @brief Returns the component-wise minimum of this vector and another
-     * vector.
+     * @brief Returns the minimum of this vector and another vector
+     * (component-wise).
      *
      * @param[in] rhs The other vector.
-     * @return The component-wise minimum of this vector and another vector.
+     * @return The minimum of this vector and another vector (component-wise).
      */
     constexpr Vec3<T> min(const Vec3<T>& rhs) const noexcept {
-        return { std::min(x, rhs.x), std::min(y, rhs.y), std::min(z, rhs.z) };
+        return {
+            .x = std::min(x, rhs.x),
+            .y = std::min(y, rhs.y),
+            .z = std::min(z, rhs.z)
+        };
     }
 
     /**
@@ -325,14 +372,18 @@ struct Vec3 {
     }
 
     /**
-     * @brief Returns the component-wise maximum of this vector and another
-     * vector.
+     * @brief Returns the maximum of this vector and another vector
+     * (component-wise).
      *
      * @param[in] rhs The other vector.
-     * @return The component-wise maximum of this vector and another vector.
+     * @return The maximum of this vector and another vector (component-wise).
      */
     constexpr Vec3<T> max(const Vec3<T>& rhs) const noexcept {
-        return { std::max(x, rhs.x), std::max(y, rhs.y), std::max(z, rhs.z) };
+        return {
+            .x = std::max(x, rhs.x),
+            .y = std::max(y, rhs.y),
+            .z = std::max(z, rhs.z)
+        };
     }
 
     /**
@@ -344,17 +395,17 @@ struct Vec3 {
      */
     constexpr Vec3<T> clamp(T min, T max) const noexcept {
         return {
-            std::clamp(x, min, max),
-            std::clamp(y, min, max),
-            std::clamp(z, min, max)
+            .x = std::clamp(x, min, max),
+            .y = std::clamp(y, min, max),
+            .z = std::clamp(z, min, max)
         };
     }
 
     /**
      * @brief Clamps the components of this vector to a specified range.
      *
-     * @param[in] min The minimum values for each component.
-     * @param[in] max The maximum values for each component (inclusive).
+     * @param[in] min The minimum values for the components.
+     * @param[in] max The maximum values for the components (inclusive).
      * @return The clamped vector.
      */
     constexpr Vec3<T> clamp(
@@ -362,43 +413,10 @@ struct Vec3 {
         const Vec3<T>& max
     ) const noexcept {
         return {
-            std::clamp(x, min.x, max.x),
-            std::clamp(y, min.y, max.y),
-            std::clamp(z, min.z, max.z)
+            .x = std::clamp(x, min.x, max.x),
+            .y = std::clamp(y, min.y, max.y),
+            .z = std::clamp(z, min.z, max.z)
         };
-    }
-
-    /**
-     * @brief Linearly interpolates between two vectors.
-     *
-     * @param[in] a The vector at `t = 0.0`.
-     * @param[in] b The vector at `t = 1.0`.
-     * @param[in] t The interpolation factor in the range `[0.0, 1.0]`.
-     * @return The interpolated vector.
-     */
-    static constexpr Vec3<T> lerp(
-        const Vec3<T>& a,
-        const Vec3<T>& b,
-        T t
-    ) noexcept {
-        return a * (static_cast<T>(1) - t) + b * t;
-    }
-
-    /**
-     * @brief Linearly interpolates between two vectors.
-     *
-     * @param[in] a The vector at `t = 0.0`.
-     * @param[in] b The vector at `t = 1.0`.
-     * @param[in] t The interpolation factor for each component in the range
-     *              `[0.0, 1.0]`.
-     * @return The interpolated vector.
-     */
-    static constexpr Vec3<T> lerp(
-        const Vec3<T>& a,
-        const Vec3<T>& b,
-        const Vec3<T>& t
-    ) noexcept {
-        return a * (Vec3<T> { 1, 1, 1 } - t) + b * t;
     }
 
 };

@@ -27,73 +27,57 @@ static constexpr f32 SPEED = 5.0F;
 /** @brief The movement speed of the camera when sprinting. */
 static constexpr f32 SPRINT_SPEED = 15.0F;
 
-/** @brief The number of spheres in each row or column. */
-static constexpr isize GRID_SIZE = 5;
-
-/** @brief The spacing between spheres. */
-static constexpr f32 GRID_SPACING = 1.25F;
-
-/** @brief The radius of the floor sphere. */
-static constexpr f32 FLOOR_RADIUS = 100.0F;
-
-/** @brief The radius of the spheres in the grid. */
-static constexpr f32 SPHERE_RADIUS = 0.5F;
-
 /**
  * @brief Creates the scene.
  *
  * @return The scene.
  */
 static constexpr Scene make_scene() {
-    Scene scene = {
+    return {
         .spheres = {
             {
-                .center = { 0.0F, -FLOOR_RADIUS - SPHERE_RADIUS, 0.0F },
-                .radius = FLOOR_RADIUS,
+                .center = { -2.0F, 0.0F, -4.0F },
+                .radius = 1.0F,
                 .material = Material::opaque()
-                    .albedo({ 0.6F, 0.6F, 0.6F })
-                    .metalness(0.0F)
-                    .roughness(0.6F)
+                    .albedo({ 0.0F, 1.0F, 0.0F })
+                    .roughness(0.25F)
+                    .metalness(0.25F)
+                    .build()
+            },
+            {
+                .center = { 0.0F, -1.0F, -3.0F },
+                .radius = 1.0F,
+                .material = Material::opaque()
+                    .albedo({ 1.0F, 0.0F, 0.0F })
+                    .roughness(0.1F)
+                    .metalness(0.75F)
+                    .build()
+            },
+            {
+                .center = { 2.0F, 0.0F, -4.0F },
+                .radius = 1.0F,
+                .material = Material::opaque()
+                    .albedo({ 0.0F, 0.0F, 1.0F })
+                    .roughness(0.35F)
+                    .metalness(0.25F)
+                    .build()
+            },
+            {
+                .center = { 0.0F, -51.0F, 0.0F },
+                .radius = 50.0F,
+                .material = Material::opaque()
+                    .albedo({ 1.0F, 1.0F, 0.0F })
+                    .roughness(0.25F)
+                    .metalness(0.25F)
                     .build()
             }
         },
         .lights = {
-            Light::point()
-                .intensity(3.0F)
-                .position({ 3.0F, 5.0F, -3.0F })
-                .build(),
-            Light::directional()
-                .color({ 0.6F, 0.7F, 1.0F })
-                .intensity(1.0F)
-                .direction({ -0.3F, -1.0F, -0.3F })
-                .build()
+            Light::point().position({ 2.0F, 1.0F, 0.0F }).build(),
+            Light::directional().direction({ -4.0F, -1.0F, -1.0F }).build()
         },
         .camera = Camera::builder().build()
     };
-    for (isize y = 0; y < GRID_SIZE; y++) {
-        f32 metalness = 1.0F
-            - static_cast<f32>(y) / static_cast<f32>(GRID_SIZE - 1);
-        for (isize x = 0; x < GRID_SIZE; x++) {
-            f32 roughness = static_cast<f32>(x)
-                / static_cast<f32>(GRID_SIZE - 1);
-            scene.spheres.emplace_back(
-                Vec3<f32> {
-                    .x = (static_cast<f32>(x) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING,
-                    .y = 0.0F,
-                    .z = (-static_cast<f32>(y) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING
-                },
-                SPHERE_RADIUS,
-                Material::opaque()
-                    .albedo({ 0.9F, 0.65F, 0.2F })
-                    .metalness(metalness)
-                    .roughness(roughness)
-                    .build()
-            );
-        }
-    }
-    return scene;
 }
 
 /**
@@ -176,9 +160,9 @@ int main() {
     try {
         Scene scene = make_scene();
         ThreadPool threadPool;
-        Film film(WIDTH, HEIGHT, 0.75F);
+        Film film(WIDTH, HEIGHT, 0.75);
         SdlContext context;
-        SdlWindow window("Metalness & Roughness", WIDTH, HEIGHT);
+        SdlWindow window("Basic Pathtracing", WIDTH, HEIGHT);
         SdlDeltaTimer deltaTimer;
         SdlFpsCounter fpsCounter;
         while (handle_events_and_inputs(deltaTimer, scene.camera, film)) {
@@ -186,8 +170,7 @@ int main() {
             window.fill(film);
             if (std::optional<f64> fps = fpsCounter.tick()) {
                 window.set_title(
-                    std::format("Metalness & Roughness – {:.1F} FPS", *fps)
-                        .c_str()
+                    std::format("Basic Pathtracing – {:.1F} FPS", *fps).c_str()
                 );
             }
         }

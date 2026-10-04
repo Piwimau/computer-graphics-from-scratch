@@ -1,6 +1,6 @@
 examples = {
-    'basic-raytracing': 'basic-raytracing.cpp',
-    'metalness-roughness': 'metalness-roughness.cpp'
+    'basic-pathtracing': 'basic-pathtracing.cpp',
+    'metalness-roughness': 'metalness-roughness.cpp',
 }
 
 cpp = meson.get_compiler('cpp')
@@ -12,6 +12,7 @@ if cpp.get_id() == 'gcc'
 endif
 
 deps += cpp.find_library('m', required: false)
+deps += dependency('sdl3')
 deps += cgfs_dep
 
 foreach name, src : examples

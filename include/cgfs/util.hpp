@@ -1,6 +1,7 @@
 #ifndef CGFS_UTIL_HPP
 #define CGFS_UTIL_HPP
 
+#include <cmath>
 #include <concepts>
 #include <numbers>
 #include "cgfs/types.hpp"
