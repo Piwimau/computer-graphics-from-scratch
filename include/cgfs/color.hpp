@@ -304,16 +304,6 @@ struct Color {
     }
 
     /**
-     * @brief Detemines if all components of this color are finite.
-     *
-     * @return `true` if all components of this color are finite, otherwise
-     * `false`.
-     */
-    constexpr bool is_finite() const noexcept {
-        return std::isfinite(r) && std::isfinite(g) && std::isfinite(b);
-    }
-
-    /**
      * @brief Applies the Reinhard tone mapping operator to this color.
      *
      * @return The tone-mapped color.

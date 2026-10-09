@@ -78,13 +78,13 @@ static constexpr f32 PI = std::numbers::pi_v<f32>;
 static constexpr f32 INF = std::numeric_limits<f32>::infinity();
 
 /** @brief The maximum number of bounces per path. */
-static constexpr isize MAX_DEPTH = 8;
+static constexpr isize MAX_DEPTH = 16;
 
 /** @brief The bounce after which russian roulette starts. */
 static constexpr isize RUSSIAN_ROULETTE_DEPTH = 3;
 
 /** @brief The minimum GGX alpha to avoid degenerate lobes. */
-static constexpr f32 MIN_ALPHA = 0.01F;
+static constexpr f32 MIN_ALPHA = 0.001F;
 
 /** @brief The maximum contribution of indirect bounces. */
 static constexpr f32 MAX_INDIRECT = 10.0F;
@@ -110,6 +110,9 @@ static constexpr std::optional<f32> intersect_sphere(
         return std::nullopt;
     }
     f32 q = -b - std::copysign(std::sqrt(d), b);
+    if (q == 0.0F) {
+        return std::nullopt;
+    }
     f32 coNorm = co.norm();
     f32 c = (coNorm - sphere.radius) * (coNorm + sphere.radius);
     auto [t0, t1] = std::minmax({ q, c / q });
@@ -144,7 +147,8 @@ static constexpr std::optional<Hit> intersect_scene(
         return std::nullopt;
     }
     Vec3<f32> position = ray.origin + ray.direction * ray.tMax;
-    Vec3<f32> outwards = (position - closest->center) / closest->radius;
+    Vec3<f32> outwards = (position - closest->center).normalize();
+    position = closest->center + outwards * closest->radius;
     return Hit {
         .position = position,
         .normal = (ray.direction.dot(outwards) < 0.0F) ? outwards : -outwards,
@@ -156,7 +160,7 @@ static constexpr std::optional<Hit> intersect_scene(
  * @brief Returns an orthonormal basis around a normal.
  *
  * @param[in] normal The normal around which to build the basis (normalized).
- * @return The orthnormal basis around the normal.
+ * @return The orthonormal basis around the normal.
  */
 static constexpr std::pair<Vec3<f32>, Vec3<f32>> make_orthonormal_basis(
     const Vec3<f32>& normal
@@ -264,9 +268,9 @@ static constexpr LightSample sample_sphere_light(
 /**
  * @brief Returns the contribution of a light for direct lighting.
  *
- * @param[in] light    The light to sample.
- * @param[in] position The position at which to sample.
- * @param[in] prng     A pseudorandom number generator.
+ * @param[in]      light    The light to sample.
+ * @param[in]      position The position at which to sample.
+ * @param[in, out] prng     A pseudorandom number generator.
  * @return The contribution of the light for direct lighting.
  */
 static constexpr LightSample sample_light(
@@ -405,26 +409,32 @@ static constexpr Color fresnel_schlick(const Color& f0, f32 cosTheta) noexcept {
 /**
  * @brief Returns the GGX normal distribution.
  *
- * @param[in] nDotH The cosine of the angle between the normal and half vector.
- * @param[in] alpha The GGX alpha of the material.
+ * @param[in] normal The surface normal (normalized).
+ * @param[in] half   The half vector between view and light directions
+ *                   (normalized).
+ * @param[in] alpha  The GGX alpha of the material.
  * @return The density of microfacet normals aligned with the half vector.
  */
-static constexpr f32 ggx_distribution(f32 nDotH, f32 alpha) noexcept {
-    f32 a2 = alpha * alpha;
-    f32 d = nDotH * nDotH * (a2 - 1.0F) + 1.0F;
-    return a2 / (PI * d * d);
+static constexpr f32 ggx_distribution(
+    const Vec3<f32>& normal,
+    const Vec3<f32>& half,
+    f32 alpha
+) noexcept {
+    Vec3<f32> nCrossH = normal.cross(half);
+    f32 nDotH = normal.dot(half);
+    f32 k = alpha / (nCrossH.dot(nCrossH) + nDotH * nDotH * alpha * alpha);
+    return k * k / PI;
 }
 
 /**
- * @brief Returns the Smith-GGX masking term for a single direction.
+ * @brief Returns the Smith-GGX denominator for a single direction.
  *
  * @param[in] nDotX The cosine of the angle between the normal and direction.
- * @param[in] alpha The GGX alpha of the material.
- * @return The fraction of microfacets visible from the direction.
+ * @param[in] a2    The square of the GGX alpha of the material.
+ * @return The Smith-GGX denominator for the direction.
  */
-static constexpr f32 smith_g1(f32 nDotX, f32 alpha) noexcept {
-    f32 a2 = alpha * alpha;
-    return 2.0F * nDotX / (nDotX + std::sqrt(a2 + (1.0F - a2) * nDotX * nDotX));
+static constexpr f32 smith_denominator(f32 nDotX, f32 a2) noexcept {
+    return nDotX + std::sqrt(a2 + (1.0F - a2) * nDotX * nDotX);
 }
 
 /**
@@ -451,12 +461,12 @@ static constexpr Color brdf(
     if (is_perfect_mirror(material)) {
         return diffuse;
     }
-    f32 nDotV = normal.dot(view);
-    f32 nDotL = normal.dot(light);
     f32 alpha = ggx_alpha(material);
-    f32 specular = ggx_distribution(normal.dot(half), alpha)
-        * smith_g1(nDotV, alpha) * smith_g1(nDotL, alpha)
-        / (4.0F * nDotV * nDotL);
+    f32 a2 = alpha * alpha;
+    f32 nDotV = std::max(normal.dot(view), 0.0F);
+    f32 nDotL = std::max(normal.dot(light), 0.0F);
+    f32 specular = ggx_distribution(normal, half, alpha)
+        / (smith_denominator(nDotV, a2) * smith_denominator(nDotL, a2));
     return diffuse + f * specular;
 }
 
@@ -525,10 +535,12 @@ static constexpr Bounce sample_bounce(
     Color reflectance = fresnel_schlick(material.f0(), normal.dot(view));
     f32 specularEnergy = reflectance.max();
     f32 diffuseEnergy = diffuse.max() * (1.0F - specularEnergy);
-    if (specularEnergy + diffuseEnergy <= 0.0F) {
+    f32 totalEnergy = specularEnergy + diffuseEnergy;
+    if (totalEnergy <= 0.0F) {
         return { .direction = normal, .weight = Color::splat(0.0F) };
     }
-    f32 specularProbability = specularEnergy / (specularEnergy + diffuseEnergy);
+    f32 specularProbability = specularEnergy / totalEnergy;
+    f32 diffuseProbability = diffuseEnergy / totalEnergy;
     if (prng.next_f32() < specularProbability) {
         if (is_perfect_mirror(material)) {
             return {
@@ -546,8 +558,12 @@ static constexpr Bounce sample_bounce(
         return {
             .direction = l,
             .weight = fresnel_schlick(material.f0(), view.dot(h))
-                * smith_g1(nDotL, alpha) / specularProbability
+                * (2.0F * nDotL / smith_denominator(nDotL, alpha * alpha))
+                / specularProbability
         };
+    }
+    if (diffuseProbability <= 0.0F) {
+        return { .direction = normal, .weight = Color::splat(0.0F) };
     }
     Vec3<f32> direction = sample_cosine_hemisphere(normal, prng);
     Vec3<f32> half = (view + direction).normalize();
@@ -557,8 +573,7 @@ static constexpr Bounce sample_bounce(
     );
     return {
         .direction = direction,
-        .weight = diffuse * (Color::splat(1.0F) - f)
-            / (1.0F - specularProbability)
+        .weight = diffuse * (Color::splat(1.0F) - f) / diffuseProbability
     };
 }
 
@@ -660,12 +675,12 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
     f32 width = static_cast<f32>(film.width());
     f32 height = static_cast<f32>(film.height());
     f32 minX = -width / 2.0F;
-    f32 maxY = height / 2.0F - 1.0F;
+    f32 maxY = height / 2.0F;
     f32 scale = 2.0F * std::tan(scene.camera.fov() / 2.0F) / height;
     Mat3<f32> viewToWorld = scene.camera.orientation().to_mat3();
     std::random_device device;
     for (isize y = 0; y < film.height(); y++) {
-        u64 seed = device();
+        u64 seed = (static_cast<u64>(device()) << 32) | device();
         threadPool.post(
             [&, y, seed]() {
                 Prng prng(seed);
@@ -673,7 +688,7 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
                     Vec3<f32> direction = {
                         .x = (minX + static_cast<f32>(x) + prng.next_f32())
                             * scale,
-                        .y = (maxY - static_cast<f32>(y) - prng.next_f32())
+                        .y = (maxY - static_cast<f32>(y + 1) + prng.next_f32())
                             * scale,
                         .z = -1.0F
                     };
@@ -684,9 +699,7 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
                         .tMax = INF
                     };
                     Color color = trace_ray(scene, ray, prng);
-                    if (color.is_finite()) {
-                        film.add_sample(x, y, color);
-                    }
+                    film.add_sample(x, y, color);
                 }
             }
         );
