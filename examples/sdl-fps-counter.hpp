@@ -51,6 +51,12 @@ public:
         return fps;
     }
 
+    /** @brief Resets this counter so the next measurement starts from now. */
+    void reset() noexcept {
+        _frames = 0;
+        _start = SDL_GetTicksNS();
+    }
+
 };
 
 }

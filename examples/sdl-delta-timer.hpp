@@ -14,7 +14,7 @@ private:
     const f64 FREQUENCY = static_cast<f64>(SDL_GetPerformanceFrequency());
 
     /** @brief The last recorded performance counter. */
-    u64 last = SDL_GetPerformanceCounter();
+    u64 _last = SDL_GetPerformanceCounter();
 
 public:
 
@@ -25,14 +25,14 @@ public:
      */
     f32 tick() {
         u64 now = SDL_GetPerformanceCounter();
-        f64 dt = static_cast<f64>(now - last) / FREQUENCY;
-        last = now;
-        return static_cast<f32>(dt);
+        f64 deltaTime = static_cast<f64>(now - _last) / FREQUENCY;
+        _last = now;
+        return static_cast<f32>(deltaTime);
     }
 
     /** @brief Resets this timer so the next tick measures from now. */
     void reset() {
-        last = SDL_GetPerformanceCounter();
+        _last = SDL_GetPerformanceCounter();
     }
 
 };

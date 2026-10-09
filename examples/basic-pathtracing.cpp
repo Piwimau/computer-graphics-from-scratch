@@ -15,6 +15,9 @@ static constexpr isize WIDTH = 1280;
 /** @brief The height of the window. */
 static constexpr isize HEIGHT = 720;
 
+/** @brief The exposure multiplier for the film. */
+static constexpr f32 EXPOSURE = 0.75;
+
 /** @brief The mouse sensitivity for rotating the camera. */
 static constexpr f32 ROTATION_SENSIVITY = 0.002F;
 
@@ -27,11 +30,6 @@ static constexpr f32 SPEED = 5.0F;
 /** @brief The movement speed of the camera when sprinting. */
 static constexpr f32 SPRINT_SPEED = 15.0F;
 
-/**
- * @brief Creates the scene.
- *
- * @return The scene.
- */
 static constexpr Scene make_scene() {
     return {
         .spheres = {
@@ -39,9 +37,9 @@ static constexpr Scene make_scene() {
                 .center = { -2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
                 .material = Material::opaque()
-                    .albedo({ 0.0F, 1.0F, 0.0F })
-                    .metalness(0.25F)
-                    .roughness(0.25F)
+                    .albedo({ 1.0F, 1.0F, 1.0F })
+                    .metalness(0.95F)
+                    .roughness(0.05F)
                     .build()
             },
             {
@@ -49,26 +47,24 @@ static constexpr Scene make_scene() {
                 .radius = 1.0F,
                 .material = Material::opaque()
                     .albedo({ 1.0F, 0.0F, 0.0F })
-                    .roughness(0.1F)
-                    .metalness(0.75F)
+                    .metalness(0.25F)
+                    .roughness(0.25F)
                     .build()
             },
             {
                 .center = { 2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
                 .material = Material::opaque()
-                    .albedo({ 0.0F, 0.0F, 1.0F })
-                    .metalness(0.25F)
-                    .roughness(0.35F)
+                    .albedo({ 0.0F, 1.0F, 0.0F })
+                    .metalness(0.5F)
+                    .roughness(0.25F)
                     .build()
             },
             {
-                .center = { 0.0F, -51.0F, 0.0F },
-                .radius = 50.0F,
+                .center = { 0.0F, -251.0F, 0.0F },
+                .radius = 250.0F,
                 .material = Material::opaque()
                     .albedo({ 1.0F, 1.0F, 0.0F })
-                    .metalness(0.0F)
-                    .roughness(0.6F)
                     .build()
             }
         },
@@ -83,13 +79,13 @@ static constexpr Scene make_scene() {
 /**
  * @brief Handles pending SDL events and inputs.
  *
- * @param[in, out] timer  The timer used to measure the delta time.
- * @param[in, out] camera The camera through which the scene is viewed.
- * @param[in, out] film   The film to render the scene to.
+ * @param[in, out] deltaTimer The timer used to measure the delta time.
+ * @param[in, out] camera     The camera through which the scene is viewed.
+ * @param[in, out] film       The film to render the scene to.
  * @return `true` if the application should continue, otherwise `false`.
  */
 static bool handle_events_and_inputs(
-    SdlDeltaTimer& timer,
+    SdlDeltaTimer& deltaTimer,
     Camera& camera,
     Film& film
 ) noexcept {
@@ -129,14 +125,14 @@ static bool handle_events_and_inputs(
     };
     bool isSprinting = keys[SDL_SCANCODE_LSHIFT] || keys[SDL_SCANCODE_RSHIFT];
     f32 speed = isSprinting ? SPRINT_SPEED : SPEED;
-    f32 dt = timer.tick();
+    f32 deltaTime = deltaTimer.tick();
     Vec3<f32> horizontal = {
         .x = axis(SDL_SCANCODE_D, SDL_SCANCODE_A),
         .y = 0.0F,
         .z = axis(SDL_SCANCODE_S, SDL_SCANCODE_W)
     };
     if ((horizontal.x != 0.0F) || (horizontal.z != 0.0F)) {
-        Vec3<f32> delta = horizontal.normalize() * speed * dt;
+        Vec3<f32> delta = horizontal.normalize() * speed * deltaTime;
         camera.adjust_position(delta, Space::VIEW);
         clearFilm = true;
     }
@@ -146,7 +142,7 @@ static bool handle_events_and_inputs(
         .z = 0.0F
     };
     if (vertical.y != 0.0F) {
-        Vec3<f32> delta = vertical.normalize() * speed * dt;
+        Vec3<f32> delta = vertical.normalize() * speed * deltaTime;
         camera.adjust_position(delta, Space::WORLD);
         clearFilm = true;
     }
@@ -160,7 +156,7 @@ int main() {
     try {
         Scene scene = make_scene();
         ThreadPool threadPool;
-        Film film(WIDTH, HEIGHT, 0.75);
+        Film film(WIDTH, HEIGHT, EXPOSURE);
         SdlContext context;
         SdlWindow window("Basic Pathtracing", WIDTH, HEIGHT);
         SdlDeltaTimer deltaTimer;

@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
 #include <limits>
@@ -25,15 +26,18 @@ struct Ray {
     Vec3<f32> direction;
 
     /** @brief The minimum distance for intersection tests. */
-    f32 tMin;
+    f32 minDistance;
 
     /** @brief The maximum distance for intersection tests. */
-    f32 tMax;
+    f32 maxDistance;
 
 };
 
 /** @brief An intersection between a ray and a surface. */
 struct Hit {
+
+    /** @brief The distance along the ray to the hit. */
+    f32 distance;
 
     /** @brief The position of the hit. */
     Vec3<f32> position;
@@ -43,6 +47,116 @@ struct Hit {
 
     /** @brief The surface material at the hit. */
     const Material* material;
+
+    /** @brief Whether the ray hit the surface from outside. */
+    bool entering;
+
+};
+
+/** @brief A stack for tracking nested media of transparent objects. */
+class MediumStack final {
+private:
+
+    /** @brief The maximum nesting depth. */
+    static constexpr isize CAPACITY = 8;
+
+    /** @brief The materials of the nested media. */
+    std::array<const Material*, CAPACITY> _materials = { };
+
+    /** @brief The current size of this stack. */
+    isize _size = 0;
+
+    /**
+     * @brief Returns the index of a material, or `-1` if it is not found.
+     *
+     * @param[in] material The material to find.
+     * @return The index of the material, or `-1` if it is not found.
+     */
+    constexpr isize find(const Material* material) const noexcept {
+        for (isize i = _size - 1; i >= 0; i--) {
+            if (_materials[i] == material) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+public:
+
+    /**
+     * @brief Determines whether this stack is empty.
+     *
+     * @return `true` if this stack is empty, otherwise `false`.
+     */
+    constexpr bool empty() const noexcept {
+        return _size == 0;
+    }
+
+    /**
+     * @brief Returns the index of refraction of the current medium.
+     *
+     * @return The index of refraction of the current medium.
+     */
+    constexpr f32 ior() const noexcept {
+        return empty() ? 1.0F : _materials[_size - 1]->as_transparent()->ior;
+    }
+
+    /**
+     * @brief Returns the absorption of the current medium.
+     *
+     * @return The absorption of the current medium.
+     */
+    constexpr Color absorption() const noexcept {
+        return empty()
+            ? Color::splat(0.0F)
+            : _materials[_size - 1]->as_transparent()->absorption;
+    }
+
+    /**
+     * @brief Returns the index of refraction of the medium surrounding a
+     * material.
+     *
+     * @param[in] material The material to find.
+     * @return The index of refraction of the medium surrounding the material.
+     */
+    constexpr f32 surrounding_ior(const Material* material) const noexcept {
+        isize i = find(material);
+        if (i < 0) {
+            return ior();
+        }
+        return (i > 0) ? _materials[i - 1]->as_transparent()->ior : 1.0F;
+    }
+
+    /**
+     * @brief Pushes a material onto this stack.
+     *
+     * @param[in] material The material to push.
+     */
+    constexpr void push(const Material* material) noexcept {
+        if (_size < CAPACITY) {
+            _materials[_size++] = material;
+        }
+    }
+
+    /**
+     * @brief Enters or leaves the object that was hit after a transmission.
+     *
+     * @param[in] hit The hit information of the surface being crossed.
+     */
+    constexpr void transition(const Hit& hit) noexcept {
+        if (hit.entering) {
+            push(hit.material);
+            return;
+        }
+        isize i = find(hit.material);
+        if (i < 0) {
+            return;
+        }
+        for (isize j = i; j + 1 < _size; j++) {
+            _materials[j] = _materials[j + 1];
+        }
+        _size--;
+    }
 
 };
 
@@ -66,8 +180,11 @@ struct Bounce {
     /** @brief The outgoing direction. */
     Vec3<f32> direction;
 
-    /** @brief The BRDF times cosine divided by the sampling probability. */
+    /** @brief The weight of the bounce. */
     Color weight;
+
+    /** @brief Whether the bounce is a transmission. */
+    bool transmitted = false;
 
 };
 
@@ -78,7 +195,7 @@ static constexpr f32 PI = std::numbers::pi_v<f32>;
 static constexpr f32 INF = std::numeric_limits<f32>::infinity();
 
 /** @brief The maximum number of bounces per path. */
-static constexpr isize MAX_DEPTH = 16;
+static constexpr isize MAX_DEPTH = 32;
 
 /** @brief The bounce after which russian roulette starts. */
 static constexpr isize RUSSIAN_ROULETTE_DEPTH = 3;
@@ -88,6 +205,47 @@ static constexpr f32 MIN_ALPHA = 0.001F;
 
 /** @brief The maximum contribution of indirect bounces. */
 static constexpr f32 MAX_INDIRECT = 10.0F;
+
+/** @brief The maximum number of surfaces a shadow ray may cross. */
+static constexpr isize MAX_SHADOW_CROSSINGS = 16;
+
+/** @brief The color of the sky at the horizon. */
+static constexpr Color SKY_HORIZON = { 0.6F, 0.7F, 0.8F };
+
+/** @brief The color of the sky at the zenith. */
+static constexpr Color SKY_ZENITH = { 0.1F, 0.2F, 0.6F };
+
+/**
+ * @brief Returns the initial stack of media containing a position.
+ *
+ * @param[in] scene    The scene containing the objects.
+ * @param[in] position The position to check for containment.
+ * @return The initial stack of media containing the position.
+ */
+static constexpr MediumStack initial_media(
+    const Scene& scene,
+    const Vec3<f32>& position
+) {
+    std::vector<const Sphere*> containing;
+    for (const Sphere& sphere : scene.spheres) {
+        Vec3<f32> offset = position - sphere.center;
+        if (
+            sphere.material.as_transparent()
+                && (offset.dot(offset) < sphere.radius * sphere.radius)
+        ) {
+            containing.push_back(&sphere);
+        }
+    }
+    std::ranges::sort(
+        containing,
+        [](const Sphere* a, const Sphere* b) { return a->radius > b->radius; }
+    );
+    MediumStack media;
+    for (const Sphere* sphere : containing) {
+        media.push(&sphere->material);
+    }
+    return media;
+}
 
 /**
  * @brief Tries to intersect a ray with a sphere.
@@ -115,10 +273,10 @@ static constexpr std::optional<f32> intersect_sphere(
     if (t0 > t1) {
         std::swap(t0, t1);
     }
-    if ((t0 > ray.tMin) && (t0 < ray.tMax)) {
+    if ((t0 > ray.minDistance) && (t0 < ray.maxDistance)) {
         return t0;
     }
-    if ((t1 > ray.tMin) && (t1 < ray.tMax)) {
+    if ((t1 > ray.minDistance) && (t1 < ray.maxDistance)) {
         return t1;
     }
     return std::nullopt;
@@ -140,20 +298,35 @@ static constexpr std::optional<Hit> intersect_scene(
     for (const Sphere& sphere : scene.spheres) {
         if (auto t = intersect_sphere(sphere, ray)) {
             closest = &sphere;
-            ray.tMax = *t;
+            ray.maxDistance = *t;
         }
     }
     if (!closest) {
         return std::nullopt;
     }
-    Vec3<f32> position = ray.origin + ray.direction * ray.tMax;
+    Vec3<f32> position = ray.origin + ray.direction * ray.maxDistance;
     Vec3<f32> outwards = (position - closest->center).normalize();
     position = closest->center + outwards * closest->radius;
+    bool entering = ray.direction.dot(outwards) < 0.0F;
     return Hit {
+        .distance = ray.maxDistance,
         .position = position,
-        .normal = (ray.direction.dot(outwards) < 0.0F) ? outwards : -outwards,
-        .material = &closest->material
+        .normal = entering ? outwards : -outwards,
+        .material = &closest->material,
+        .entering = entering
     };
+}
+
+/**
+ * @brief Returns the color of the sky in a direction.
+ *
+ * @param[in] direction The direction in which to sample.
+ * @return The color of the sky in the direction.
+ */
+static constexpr Color sky_color(const Vec3<f32>& direction) noexcept {
+    f32 t = std::clamp(direction.y, 0.0F, 1.0F);
+    f32 inverse = 1.0F - t;
+    return Color::lerp(SKY_HORIZON, SKY_ZENITH, 1.0F - inverse * inverse);
 }
 
 /**
@@ -405,6 +578,109 @@ static constexpr Color fresnel_schlick(const Color& f0, f32 cosTheta) noexcept {
 }
 
 /**
+ * @brief Returns the fresnel reflectance of a dielectric interface.
+ *
+ * @param[in] cosI The cosine of the incident angle.
+ * @param[in] etaI The index of refraction on the incident side.
+ * @param[in] etaT The index of refraction on the transmitted side.
+ * @return The fresnel reflectance and the cosine of the transmitted angle.
+ */
+static constexpr std::pair<f32, f32> fresnel_dielectric(
+    f32 cosI,
+    f32 etaI,
+    f32 etaT
+) noexcept {
+    f32 eta = etaI / etaT;
+    f32 sin2T = eta * eta * (1.0F - cosI * cosI);
+    if (sin2T >= 1.0F) {
+        return { 1.0F, 0.0F };
+    }
+    f32 cosT = std::sqrt(1.0F - sin2T);
+    f32 a = etaI * cosI;
+    f32 b = etaT * cosT;
+    f32 c = etaT * cosI;
+    f32 d = etaI * cosT;
+    f32 rs = (a - b) / std::max(a + b, 1.0E-12F);
+    f32 rp = (c - d) / std::max(c + d, 1.0E-12F);
+    return { 0.5F * (rs * rs + rp * rp), cosT };
+}
+
+/**
+ * @brief Returns the indices of refraction on the incident and transmitted side
+ * of a hit.
+ *
+ * @param[in] hit         The hit information.
+ * @param[in] transparent The properties of the transparent material.
+ * @param[in] media       The medium stack.
+ * @return The indices of refraction on the incident and transmitted side.
+ */
+static constexpr std::pair<f32, f32> interface_iors(
+    const Hit& hit,
+    const Material::Transparent& transparent,
+    const MediumStack& media
+) noexcept {
+    if (hit.entering) {
+        return { media.ior(), transparent.ior };
+    }
+    return { transparent.ior, media.surrounding_ior(hit.material) };
+}
+
+/**
+ * @brief Samples a dielectric material.
+ *
+ * @param[in]      hit         The hit information.
+ * @param[in]      transparent The properties of the transparent material.
+ * @param[in]      media       The medium stack.
+ * @param[in]      view        The direction towards the camera (normalized).
+ * @param[in, out] prng        A pseudorandom number generator.
+ * @return The sampled bounce for the dielectric material.
+ */
+static constexpr Bounce sample_dielectric(
+    const Hit& hit,
+    const Material::Transparent& transparent,
+    const MediumStack& media,
+    const Vec3<f32>& view,
+    Prng& prng
+) noexcept {
+    auto [etaI, etaT] = interface_iors(hit, transparent, media);
+    f32 cosI = std::clamp(hit.normal.dot(view), 0.0F, 1.0F);
+    auto [fresnel, cosT] = fresnel_dielectric(cosI, etaI, etaT);
+    if (prng.next_f32() < fresnel) {
+        return {
+            .direction = view.reflect(hit.normal),
+            .weight = Color::splat(1.0F)
+        };
+    }
+    f32 eta = etaI / etaT;
+    return {
+        .direction = (-view * eta + hit.normal * (eta * cosI - cosT))
+            .normalize(),
+        .weight = Color::splat(1.0F),
+        .transmitted = true
+    };
+}
+
+/**
+ * @brief Returns the fraction of light that survives while traveling through a
+ * medium.
+ *
+ * @param[in] absorption The absorption of the medium.
+ * @param[in] distance   The distance traveled through the medium.
+ * @return The fraction of light that survives while traveling through the
+ * medium.
+ */
+static constexpr Color beer_lambert(
+    const Color& absorption,
+    f32 distance
+) noexcept {
+    return Color {
+        .r = std::exp(-absorption.r * distance),
+        .g = std::exp(-absorption.g * distance),
+        .b = std::exp(-absorption.b * distance)
+    };
+}
+
+/**
  * @brief Returns the GGX normal distribution.
  *
  * @param[in] normal The surface normal (normalized).
@@ -523,7 +799,7 @@ static constexpr Vec3<f32> sample_ggx_normal(
  * @param[in, out] prng     A pseudorandom number generator.
  * @return The sampled bounce (with a weight of zero if it is not usable).
  */
-static constexpr Bounce sample_bounce(
+static constexpr Bounce sample_opaque(
     const Material& material,
     const Vec3<f32>& normal,
     const Vec3<f32>& view,
@@ -576,10 +852,58 @@ static constexpr Bounce sample_bounce(
 }
 
 /**
+ * @brief Returns the fraction of light that survives a shadow ray.
+ *
+ * @param[in] scene The scene to trace the shadow ray through.
+ * @param[in] ray   The shadow ray.
+ * @param[in] media The media at the origin of the ray.
+ * @return The fraction of light that survives the shadow ray.
+ */
+static constexpr Color shadow_transmittance(
+    const Scene& scene,
+    Ray ray,
+    MediumStack media
+) noexcept {
+    Color transmittance = Color::splat(1.0F);
+    for (isize i = 0; i < MAX_SHADOW_CROSSINGS; i++) {
+        std::optional<Hit> hit = intersect_scene(scene, ray);
+        if (!hit) {
+            if (!media.empty() && (ray.maxDistance != INF)) {
+                transmittance *= beer_lambert(
+                    media.absorption(),
+                    std::max(ray.maxDistance, 0.0F)
+                );
+            }
+            return transmittance;
+        }
+        auto transparent = hit->material->as_transparent();
+        if (!transparent) {
+            return Color::splat(0.0F);
+        }
+        if (!media.empty()) {
+            transmittance *= beer_lambert(media.absorption(), hit->distance);
+        }
+        auto [etaI, etaT] = interface_iors(*hit, *transparent, media);
+        f32 cosI = std::clamp(hit->normal.dot(-ray.direction), 0.0F, 1.0F);
+        auto [fresnel, _] = fresnel_dielectric(
+            cosI,
+            std::min(etaI, etaT),
+            std::max(etaI, etaT)
+        );
+        transmittance *= transparent->transparency * (1.0F - fresnel);
+        media.transition(*hit);
+        ray.origin = offset_position(hit->position, -hit->normal);
+        ray.maxDistance -= hit->distance;
+    }
+    return Color::splat(0.0F);
+}
+
+/**
  * @brief Returns the direct lighting at a specified position.
  *
  * @param[in]      scene The scene containing lights and spheres.
  * @param[in]      hit   The position at which to compute the lighting.
+ * @param[in]      media The media at the hit.
  * @param[in]      view  The direction towards the camera (normalized).
  * @param[in, out] prng  A pseudorandom number generator.
  * @return The direct lighting at the specified position.
@@ -587,6 +911,7 @@ static constexpr Bounce sample_bounce(
 static constexpr Color direct_lighting(
     const Scene& scene,
     const Hit& hit,
+    const MediumStack& media,
     const Vec3<f32>& view,
     Prng& prng
 ) noexcept {
@@ -600,19 +925,14 @@ static constexpr Color direct_lighting(
         Ray shadowRay = {
             .origin = offset_position(hit.position, hit.normal),
             .direction = sample.direction,
-            .tMin = 0.0F,
-            .tMax = sample.distance
+            .minDistance = 0.0F,
+            .maxDistance = sample.distance
         };
-        bool occluded = std::ranges::any_of(
-            scene.spheres,
-            [&](const Sphere& sphere) {
-                return intersect_sphere(sphere, shadowRay) != std::nullopt;
-            }
-        );
-        if (occluded) {
+        Color visibility = shadow_transmittance(scene, shadowRay, media);
+        if (visibility.max() <= 0.0F) {
             continue;
         }
-        radiance += sample.radiance
+        radiance += sample.radiance * visibility
             * brdf(*hit.material, hit.normal, view, sample.direction)
             * cosTheta;
     }
@@ -624,29 +944,45 @@ static constexpr Color direct_lighting(
  *
  * @param[in]      scene The scene to trace the ray through.
  * @param[in]      ray   The ray to trace.
+ * @param[in]      media The media through which the ray is traced.
  * @param[in, out] prng  A pseudorandom number generator.
  * @return The color obtained by tracing a ray through a pixel.
  */
 static constexpr Color trace_ray(
     const Scene& scene,
     Ray ray,
+    MediumStack media,
     Prng& prng
 ) noexcept {
     Color radiance = Color::splat(0.0F);
     Color throughput = Color::splat(1.0F);
+    isize opaqueHits = 0;
     for (isize depth = 0; depth < MAX_DEPTH; depth++) {
         std::optional<Hit> hit = intersect_scene(scene, ray);
         if (!hit) {
+            radiance += throughput * sky_color(ray.direction);
             break;
         }
-        Vec3<f32> view = -ray.direction;
-        Color direct = throughput * direct_lighting(scene, *hit, view, prng);
-        f32 directMax = direct.max();
-        if ((depth > 0) && (directMax > MAX_INDIRECT)) {
-            direct *= MAX_INDIRECT / directMax;
+        if (!media.empty()) {
+            throughput *= beer_lambert(media.absorption(), hit->distance);
         }
-        radiance += direct;
-        Bounce bounce = sample_bounce(*hit->material, hit->normal, view, prng);
+        Vec3<f32> view = -ray.direction;
+        auto transparent = hit->material->as_transparent();
+        bool useDielectric = transparent
+            && (prng.next_f32() < transparent->transparency);
+        Bounce bounce = useDielectric
+            ? sample_dielectric(*hit, *transparent, media, view, prng)
+            : sample_opaque(*hit->material, hit->normal, view, prng);
+        if (!useDielectric) {
+            Color direct = throughput
+                * direct_lighting(scene, *hit, media, view, prng);
+            f32 directMax = direct.max();
+            if ((opaqueHits > 0) && (directMax > MAX_INDIRECT)) {
+                direct *= MAX_INDIRECT / directMax;
+            }
+            radiance += direct;
+            opaqueHits++;
+        }
         throughput *= bounce.weight;
         f32 throughputMax = throughput.max();
         if (throughputMax <= 0.0F) {
@@ -659,11 +995,19 @@ static constexpr Color trace_ray(
             }
             throughput /= survival;
         }
+        if (bounce.transmitted) {
+            media.transition(*hit);
+        }
         ray = {
-            .origin = offset_position(hit->position, hit->normal),
+            .origin = offset_position(
+                hit->position,
+                (bounce.direction.dot(hit->normal) < 0.0F)
+                    ? -hit->normal
+                    : hit->normal
+            ),
             .direction = bounce.direction,
-            .tMin = 0.0F,
-            .tMax = INF
+            .minDistance = 0.0F,
+            .maxDistance = INF
         };
     }
     return radiance;
@@ -676,6 +1020,7 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
     f32 maxY = height / 2.0F;
     f32 scale = 2.0F * std::tan(scene.camera.fov() / 2.0F) / height;
     Mat3<f32> viewToWorld = scene.camera.orientation().to_mat3();
+    MediumStack media = initial_media(scene, scene.camera.position());
     std::random_device device;
     for (isize y = 0; y < film.height(); y++) {
         u64 seed = (static_cast<u64>(device()) << 32) | device();
@@ -693,10 +1038,10 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
                     Ray ray = {
                         .origin = scene.camera.position(),
                         .direction = (viewToWorld * direction).normalize(),
-                        .tMin = 0.0F,
-                        .tMax = INF
+                        .minDistance = 0.0F,
+                        .maxDistance = INF
                     };
-                    Color color = trace_ray(scene, ray, prng);
+                    Color color = trace_ray(scene, ray, media, prng);
                     film.add_sample(x, y, color);
                 }
             }

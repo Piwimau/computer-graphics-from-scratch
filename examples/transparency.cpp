@@ -30,68 +30,83 @@ static constexpr f32 SPEED = 5.0F;
 /** @brief The movement speed of the camera when sprinting. */
 static constexpr f32 SPRINT_SPEED = 15.0F;
 
-/** @brief The number of spheres in each row or column. */
-static constexpr isize GRID_SIZE = 5;
-
-/** @brief The spacing between spheres. */
-static constexpr f32 GRID_SPACING = 1.25F;
-
-/** @brief The radius of the floor sphere. */
-static constexpr f32 FLOOR_RADIUS = 250.0F;
-
-/** @brief The radius of the spheres in the grid. */
-static constexpr f32 SPHERE_RADIUS = 0.5F;
-
 static constexpr Scene make_scene() {
-    Scene scene = {
+    return {
         .spheres = {
             {
-                .center = { 0.0F, -FLOOR_RADIUS - SPHERE_RADIUS, 0.0F },
-                .radius = FLOOR_RADIUS,
+                .center = { 0.0F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .material = Material::transparent().ior(1.5F).build()
+            },
+            {
+                .center = { -2.4F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .material = Material::transparent()
+                    .ior(1.5F)
+                    .absorption({ 0.9F, 0.1F, 0.9F })
+                    .build()
+            },
+            {
+                .center = { 2.4F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .material = Material::transparent().ior(1.5F).build()
+            },
+            {
+                .center = { 2.4F, 0.0F, -5.0F },
+                .radius = 0.75F,
+                .material = Material::transparent().ior(1.0F).build()
+            },
+            {
+                .center = { -0.9F, -0.6F, -2.6F },
+                .radius = 0.4F,
+                .material = Material::transparent()
+                    .albedo({ 0.9F, 0.9F, 1.0F })
+                    .roughness(0.3F)
+                    .transparency(0.5F)
+                    .ior(1.33F)
+                    .build()
+            },
+            {
+                .center = { 1.0F, -0.6F, -2.6F },
+                .radius = 0.4F,
+                .material = Material::transparent()
+                    .ior(1.45F)
+                    .absorption({ 0.5F, 2.0F, 4.0F })
+                    .build()
+            },
+            {
+                .center = { -0.8F, 0.5F, -10.0F },
+                .radius = 1.5F,
                 .material = Material::opaque()
-                    .albedo({ 0.6F, 0.6F, 0.6F })
+                    .albedo({ 1.0F, 0.1F, 0.1F })
+                    .roughness(0.4F)
+                    .build()
+            },
+            {
+                .center = { 3.6F, 0.0F, -9.0F },
+                .radius = 1.0F,
+                .material = Material::opaque()
+                    .albedo({ 0.1F, 0.2F, 1.0F })
+                    .metalness(0.25F)
+                    .roughness(0.3F)
+                    .build()
+            },
+            {
+                .center = { 0.0F, -501.0F, 0.0F },
+                .radius = 500.0F,
+                .material = Material::opaque()
+                    .albedo({ 1.0F, 1.0F, 1.0F })
                     .metalness(0.0F)
-                    .roughness(0.6F)
+                    .roughness(0.75F)
                     .build()
             }
         },
         .lights = {
-            Light::point()
-                .intensity(3.0F)
-                .position({ 3.0F, 5.0F, -3.0F })
-                .build(),
-            Light::directional()
-                .color({ 0.6F, 0.7F, 1.0F })
-                .intensity(1.0F)
-                .direction({ -0.3F, -1.0F, -0.3F })
-                .build()
+            Light::point().position({ 2.0F, 2.0F, 0.0F }).build(),
+            Light::directional().direction({ -1.5F, -3.0F, -1.5F }).build()
         },
         .camera = Camera::builder().build()
     };
-    for (isize y = 0; y < GRID_SIZE; y++) {
-        f32 metalness = 1.0F
-            - static_cast<f32>(y) / static_cast<f32>(GRID_SIZE - 1);
-        for (isize x = 0; x < GRID_SIZE; x++) {
-            f32 roughness = static_cast<f32>(x)
-                / static_cast<f32>(GRID_SIZE - 1);
-            scene.spheres.emplace_back(
-                Vec3<f32> {
-                    .x = (static_cast<f32>(x) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING,
-                    .y = 0.0F,
-                    .z = (-static_cast<f32>(y) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING
-                },
-                SPHERE_RADIUS,
-                Material::opaque()
-                    .albedo({ 0.9F, 0.65F, 0.2F })
-                    .metalness(metalness)
-                    .roughness(roughness)
-                    .build()
-            );
-        }
-    }
-    return scene;
 }
 
 /**
@@ -176,7 +191,7 @@ int main() {
         ThreadPool threadPool;
         Film film(WIDTH, HEIGHT, EXPOSURE);
         SdlContext context;
-        SdlWindow window("Metalness & Roughness", WIDTH, HEIGHT);
+        SdlWindow window("Transparency", WIDTH, HEIGHT);
         SdlDeltaTimer deltaTimer;
         SdlFpsCounter fpsCounter;
         while (handle_events_and_inputs(deltaTimer, scene.camera, film)) {
@@ -184,8 +199,7 @@ int main() {
             window.fill(film);
             if (std::optional<f64> fps = fpsCounter.tick()) {
                 window.set_title(
-                    std::format("Metalness & Roughness – {:.1F} FPS", *fps)
-                        .c_str()
+                    std::format("Transparency – {:.1F} FPS", *fps).c_str()
                 );
             }
         }

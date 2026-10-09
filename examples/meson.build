@@ -1,6 +1,7 @@
 examples = {
     'basic-pathtracing': 'basic-pathtracing.cpp',
     'metalness-roughness': 'metalness-roughness.cpp',
+    'transparency': 'transparency.cpp',
 }
 
 cpp = meson.get_compiler('cpp')
