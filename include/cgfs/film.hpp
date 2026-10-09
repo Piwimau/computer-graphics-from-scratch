@@ -3,12 +3,10 @@
 
 #include <algorithm>
 #include <cassert>
-#include <cmath>
 #include <span>
 #include <utility>
 #include <vector>
 #include "cgfs/color.hpp"
-#include "cgfs/pixel.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/util.hpp"
 
@@ -17,28 +15,31 @@ namespace cgfs {
 /** @brief The tone mapping operators supported by a film. */
 enum class ToneMapping {
 
-    /**
-     * @brief Indicates that no tone mapping operator should be applied (i.e.,
-     * everything is simply clamped).
-     */
+    /** @brief Apply no tone mapping operator (i.e., clamp everything). */
     NONE,
 
-    /**
-     * @brief Indicates that the Reinhard tone mapping operator should be
-     * applied.
-     */
+    /** @brief Apply the Reinhard tone mapping operator. */
     REINHARD,
 
-    /**
-     * @brief Indicates that the ACES tone mapping operator should be applied.
-     */
+    /** @brief Apply the ACES tone mapping operator. */
     ACES,
 
-    /**
-     * @brief Indicates that the Khronos PBR Neutral tone mapping operator
-     * should be applied.
-     */
+    /** @brief Apply the Khronos PBR Neutral tone mapping operator. */
     KHRONOS_PBR_NEUTRAL
+
+};
+
+/** @brief A pixel in the RGB color format. */
+struct Pixel {
+
+    /** @brief The red component. */
+    u8 r;
+
+    /** @brief The green component. */
+    u8 g;
+
+    /** @brief The blue component. */
+    u8 b;
 
 };
 
@@ -52,13 +53,13 @@ private:
     /** @brief The accumulation buffer. */
     std::vector<Color> _buffer;
 
-    /** @brief The width. */
+    /** @brief The width of this film. */
     isize _width;
 
-    /** @brief The height. */
+    /** @brief The height of this film. */
     isize _height;
 
-    /** @brief The number of frames. */
+    /** @brief The number of accumulated frames. */
     isize _frames = 0;
 
     /** @brief The exposure multiplier applied before tone mapping. */
@@ -68,7 +69,7 @@ private:
     ToneMapping _toneMapping;
 
     /**
-     * @brief Creates an empty accumulation buffer.
+     * @brief Constructs an empty accumulation buffer.
      *
      * @param[in] width  The width of the film.
      * @param[in] height The height of the film.
@@ -90,7 +91,7 @@ public:
      * @param[in] width       The width of the film.
      * @param[in] height      The height of the film.
      * @param[in] exposure    The exposure multiplier applied before tone
-     *                        mapping (linear).
+     *                        mapping.
      * @param[in] toneMapping The tone mapping operator to apply.
      *
      * @warning The behavior is undefined if `width`, `height`, or `exposure` is
@@ -111,27 +112,27 @@ public:
     }
 
     /**
-     * @brief Returns the width.
+     * @brief Returns the width of this film.
      *
-     * @return The width.
+     * @return The width of this film.
      */
     constexpr isize width() const noexcept {
         return _width;
     }
 
     /**
-     * @brief Returns the height.
+     * @brief Returns the height of this film.
      *
-     * @return The height.
+     * @return The height of this film.
      */
     constexpr isize height() const noexcept {
         return _height;
     }
 
     /**
-     * @brief Returns the number of frames.
+     * @brief Returns the number of accumulated frames.
      *
-     * @return The number of frames.
+     * @return The number of accumulated frames.
      */
     constexpr isize frames() const noexcept {
         return _frames;

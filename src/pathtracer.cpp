@@ -7,7 +7,7 @@
 #include <random>
 #include <utility>
 #include "cgfs/color.hpp"
-#include "cgfs/overloaded.hpp"
+#include "cgfs/overload.hpp"
 #include "cgfs/pathtracer.hpp"
 #include "cgfs/prng.hpp"
 #include "cgfs/types.hpp"
@@ -101,25 +101,25 @@ static constexpr std::optional<f32> intersect_sphere(
     const Sphere& sphere,
     const Ray& ray
 ) noexcept {
-    Vec3<f32> co = ray.origin - sphere.center;
-    f32 b = co.dot(ray.direction);
-    Vec3<f32> l = co - b * ray.direction;
-    f32 lNorm = l.norm();
-    f32 d = (sphere.radius + lNorm) * (sphere.radius - lNorm);
+    Vec3<f32> f = ray.origin - sphere.center;
+    f32 b = -f.dot(ray.direction);
+    Vec3<f32> l = f + ray.direction * b;
+    f32 d = sphere.radius * sphere.radius - l.dot(l);
     if (d < 0.0F) {
         return std::nullopt;
     }
-    f32 q = -b - std::copysign(std::sqrt(d), b);
-    if (q == 0.0F) {
-        return std::nullopt;
+    f32 c = f.dot(f) - sphere.radius * sphere.radius;
+    f32 q = b + std::copysign(std::sqrt(d), b);
+    f32 t0 = (q != 0.0F) ? c / q : 0.0F;
+    f32 t1 = q;
+    if (t0 > t1) {
+        std::swap(t0, t1);
     }
-    f32 coNorm = co.norm();
-    f32 c = (coNorm - sphere.radius) * (coNorm + sphere.radius);
-    auto [t0, t1] = std::minmax({ q, c / q });
-    for (f32 t : { t0, t1 }) {
-        if ((t >= ray.tMin) && (t <= ray.tMax)) {
-            return t;
-        }
+    if ((t0 > ray.tMin) && (t0 < ray.tMax)) {
+        return t0;
+    }
+    if ((t1 > ray.tMin) && (t1 < ray.tMax)) {
+        return t1;
     }
     return std::nullopt;
 }
@@ -280,7 +280,7 @@ static constexpr LightSample sample_light(
 ) noexcept {
     Color emitted = light.color() * light.intensity();
     return std::visit(
-        Overloaded {
+        Overload {
             [&](const Light::Point& point) {
                 LightSample sample = sample_sphere_light(
                     point.position,
@@ -302,11 +302,9 @@ static constexpr LightSample sample_light(
                 );
                 f32 cosAngle = (position - spot.position).normalize()
                     .dot(spot.direction.normalize());
-                f32 cosInner = std::cos(spot.innerCutoff);
-                f32 cosOuter = std::cos(spot.outerCutoff);
                 f32 t = std::clamp(
-                    (cosAngle - cosOuter)
-                        / std::max(cosInner - cosOuter, 1.0E-6F),
+                    (cosAngle - spot.outerCutoff)
+                        / std::max(spot.innerCutoff - spot.outerCutoff, 1.0E-6F),
                     0.0F,
                     1.0F
                 );
@@ -315,10 +313,10 @@ static constexpr LightSample sample_light(
             },
             [&](const Light::Directional& directional) {
                 Vec3<f32> direction = (-directional.direction).normalize();
-                if (directional.angularRadius > 0.0F) {
+                if (directional.angularRadius < 1.0F) {
                     direction = sample_cone(
                         direction,
-                        std::cos(directional.angularRadius),
+                        directional.angularRadius,
                         prng
                     );
                 }

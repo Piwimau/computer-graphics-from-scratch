@@ -10,7 +10,7 @@
 
 namespace cgfs {
 
-/** @brief A light in a scene. */
+/** @brief A light illuminating a scene. */
 class Light final {
 public:
 
@@ -51,10 +51,10 @@ public:
         /** @brief The direction in world space. */
         Vec3<f32> direction;
 
-        /** @brief The inner cutoff angle (in radians). */
+        /** @brief The cosine of the inner cutoff angle (in radians). */
         f32 innerCutoff;
 
-        /** @brief The outer cutoff angle (in radians). */
+        /** @brief The cosine of the outer cutoff angle (in radians). */
         f32 outerCutoff;
 
         /** @brief The radius. */
@@ -71,7 +71,7 @@ public:
         /** @brief The direction in world space. */
         Vec3<f32> direction;
 
-        /** @brief The angular radius (in radians). */
+        /** @brief The cosine of the angular radius (in radians). */
         f32 angularRadius;
 
     };
@@ -164,14 +164,12 @@ public:
     class PointBuilder final : public Builder<PointBuilder> {
     private:
 
-        /** @brief The position of the light in world space. */
-        Vec3<f32> _position = DEFAULT_POSITION;
-
-        /** @brief The radius of the light. */
-        f32 _radius = DEFAULT_RADIUS;
-
-        /** @brief The attenuation factors of the light. */
-        Attenuation _attenuation = DEFAULT_ATTENUATION;
+        /** @brief The properties of the light. */
+        Point _point = {
+            .position = DEFAULT_POSITION,
+            .radius = DEFAULT_RADIUS,
+            .attenuation = DEFAULT_ATTENUATION
+        };
 
     public:
 
@@ -182,7 +180,7 @@ public:
          * @return A reference to this builder.
          */
         constexpr PointBuilder& position(const Vec3<f32>& position) noexcept {
-            _position = position;
+            _point.position = position;
             return *this;
         }
 
@@ -196,32 +194,26 @@ public:
          */
         constexpr PointBuilder& radius(f32 radius) noexcept {
             assert(radius >= 0.0F);
-            _radius = radius;
+            _point.radius = radius;
             return *this;
         }
 
         /**
          * @brief Sets the attenuation factors of the light.
          *
-         * @param[in] constant  The constant attenuation factor of the light.
-         * @param[in] linear    The linear attenuation factor of the light.
-         * @param[in] quadratic The quadratic attenuation factor of the light.
+         * @param[in] attenuation The attenuation factors of the light.
          * @return A reference to this builder.
          *
-         * @warning The behavior is undefined if `constant`, `linear`, or
-         * `quadratic` is negative.
+         * @warning The behavior is undefined if any component of `attenuation`
+         * is negative.
          */
         constexpr PointBuilder& attenuation(
-            f32 constant,
-            f32 linear,
-            f32 quadratic
+            const Attenuation& attenuation
         ) noexcept {
-            assert(constant >= 0.0F);
-            assert(linear >= 0.0F);
-            assert(quadratic >= 0.0F);
-            _attenuation.constant = constant;
-            _attenuation.linear = linear;
-            _attenuation.quadratic = quadratic;
+            assert(attenuation.constant >= 0.0F);
+            assert(attenuation.linear >= 0.0F);
+            assert(attenuation.quadratic >= 0.0F);
+            _point.attenuation = attenuation;
             return *this;
         }
 
@@ -231,11 +223,7 @@ public:
          * @return The point light.
          */
         constexpr Light build() const noexcept {
-            return Light(
-                _color,
-                _intensity,
-                Point { _position, _radius, _attenuation }
-            );
+            return Light(_color, _intensity, _point);
         }
 
     };
@@ -244,23 +232,15 @@ public:
     class SpotBuilder final : public Builder<SpotBuilder> {
     private:
 
-        /** @brief The position of the light in world space. */
-        Vec3<f32> _position = DEFAULT_POSITION;
-
-        /** @brief The direction of the light in world space. */
-        Vec3<f32> _direction = DEFAULT_DIRECTION;
-
-        /** @brief The inner cutoff angle of the light (in radians). */
-        f32 _innerCutoff = DEFAULT_INNER_CUTOFF;
-
-        /** @brief The outer cutoff angle of the light (in radians). */
-        f32 _outerCutoff = DEFAULT_OUTER_CUTOFF;
-
-        /** @brief The radius of the light. */
-        f32 _radius = DEFAULT_RADIUS;
-
-        /** @brief The attenuation factors of the light. */
-        Attenuation _attenuation = DEFAULT_ATTENUATION;
+        /** @brief The properties of the light. */
+        Spot _spot = {
+            .position = DEFAULT_POSITION,
+            .direction = DEFAULT_DIRECTION,
+            .innerCutoff = std::cos(DEFAULT_INNER_CUTOFF),
+            .outerCutoff = std::cos(DEFAULT_OUTER_CUTOFF),
+            .radius = DEFAULT_RADIUS,
+            .attenuation = DEFAULT_ATTENUATION
+        };
 
     public:
 
@@ -271,7 +251,7 @@ public:
          * @return A reference to this builder.
          */
         constexpr SpotBuilder& position(const Vec3<f32>& position) noexcept {
-            _position = position;
+            _spot.position = position;
             return *this;
         }
 
@@ -285,7 +265,7 @@ public:
          */
         constexpr SpotBuilder& direction(const Vec3<f32>& direction) noexcept {
             assert(direction.norm() > 0.0F);
-            _direction = direction.normalize();
+            _spot.direction = direction.normalize();
             return *this;
         }
 
@@ -315,8 +295,8 @@ public:
                 (outerCutoff > 0.0F) && (outerCutoff < cgfs::radians(180.0F))
             );
             assert(innerCutoff <= outerCutoff);
-            _innerCutoff = innerCutoff;
-            _outerCutoff = outerCutoff;
+            _spot.innerCutoff = std::cos(innerCutoff);
+            _spot.outerCutoff = std::cos(outerCutoff);
             return *this;
         }
 
@@ -330,32 +310,26 @@ public:
          */
         constexpr SpotBuilder& radius(f32 radius) noexcept {
             assert(radius >= 0.0F);
-            _radius = radius;
+            _spot.radius = radius;
             return *this;
         }
 
         /**
          * @brief Sets the attenuation factors of the light.
          *
-         * @param[in] constant  The constant attenuation factor of the light.
-         * @param[in] linear    The linear attenuation factor of the light.
-         * @param[in] quadratic The quadratic attenuation factor of the light.
+         * @param[in] attenuation The attenuation factors of the light.
          * @return A reference to this builder.
          *
-         * @warning The behavior is undefined if `constant`, `linear`, or
-         * `quadratic` is negative.
+         * @warning The behavior is undefined if any component of `attenuation`
+         * is negative.
          */
         constexpr SpotBuilder& attenuation(
-            f32 constant,
-            f32 linear,
-            f32 quadratic
+            const Attenuation& attenuation
         ) noexcept {
-            assert(constant >= 0.0F);
-            assert(linear >= 0.0F);
-            assert(quadratic >= 0.0F);
-            _attenuation.constant = constant;
-            _attenuation.linear = linear;
-            _attenuation.quadratic = quadratic;
+            assert(attenuation.constant >= 0.0F);
+            assert(attenuation.linear >= 0.0F);
+            assert(attenuation.quadratic >= 0.0F);
+            _spot.attenuation = attenuation;
             return *this;
         }
 
@@ -365,18 +339,7 @@ public:
          * @return The spot light.
          */
         constexpr Light build() const noexcept {
-            return Light(
-                _color,
-                _intensity,
-                Spot {
-                    _position,
-                    _direction,
-                    _innerCutoff,
-                    _outerCutoff,
-                    _radius,
-                    _attenuation
-                }
-            );
+            return Light(_color, _intensity, _spot);
         }
 
     };
@@ -385,11 +348,11 @@ public:
     class DirectionalBuilder final : public Builder<DirectionalBuilder> {
     private:
 
-        /** @brief The direction of the light in world space. */
-        Vec3<f32> _direction = DEFAULT_DIRECTION;
-
-        /** @brief The angular radius of the light (in radians). */
-        f32 _angularRadius = DEFAULT_ANGULAR_RADIUS;
+        /** @brief The properties of the light. */
+        Directional _directional = {
+            .direction = DEFAULT_DIRECTION,
+            .angularRadius = std::cos(DEFAULT_ANGULAR_RADIUS)
+        };
 
     public:
 
@@ -405,7 +368,7 @@ public:
             const Vec3<f32>& direction
         ) noexcept {
             assert(direction.norm() > 0.0F);
-            _direction = direction.normalize();
+            _directional.direction = direction.normalize();
             return *this;
         }
 
@@ -426,7 +389,7 @@ public:
                 (angularRadius >= 0.0F)
                     && (angularRadius < cgfs::radians(90.0F))
             );
-            _angularRadius = angularRadius;
+            _directional.angularRadius = std::cos(angularRadius);
             return *this;
         }
 
@@ -436,11 +399,7 @@ public:
          * @return The directional light.
          */
         constexpr Light build() const noexcept {
-            return Light(
-                _color,
-                _intensity,
-                Directional { _direction, _angularRadius }
-            );
+            return Light(_color, _intensity, _directional);
         }
 
     };
@@ -471,7 +430,7 @@ private:
 public:
 
     /**
-     * @brief Creates a builder for a point light.
+     * @brief Constructs a builder for a point light.
      *
      * @return A builder for a point light.
      */
@@ -480,7 +439,7 @@ public:
     }
 
     /**
-     * @brief Creates a builder for a spot light.
+     * @brief Constructs a builder for a spot light.
      *
      * @return A builder for a spot light.
      */
@@ -489,7 +448,7 @@ public:
     }
 
     /**
-     * @brief Creates a builder for a directional light.
+     * @brief Constructs a builder for a directional light.
      *
      * @return A builder for a directional light.
      */

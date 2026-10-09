@@ -15,7 +15,7 @@ private:
     std::array<u32, 4> _state;
 
     /**
-     * @brief Creates an initial state based on a specified seed.
+     * @brief Constructs an initial state based on a specified seed.
      *
      * @param[in] seed The seed for the initialization.
      * @return An initial state for the pseudorandom number generator.

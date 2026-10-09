@@ -10,7 +10,7 @@ namespace cgfs {
 /** @brief A sphere. */
 struct Sphere {
 
-    /** @brief The center in world space. */
+    /** @brief The position in world space. */
     Vec3<f32> center;
 
     /** @brief The radius. */

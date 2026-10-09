@@ -108,8 +108,8 @@ public:
     class OpaqueBuilder final : public Builder<OpaqueBuilder> {
     private:
 
-        /** @brief The metalness of the material. */
-        f32 _metalness = DEFAULT_METALNESS;
+        /** @brief The properties of the material. */
+        Opaque _opaque = { .metalness = DEFAULT_METALNESS };
 
     public:
 
@@ -124,7 +124,7 @@ public:
          */
         constexpr OpaqueBuilder& metalness(f32 metalness) noexcept {
             assert((metalness >= 0.0F) && (metalness <= 1.0F));
-            _metalness = metalness;
+            _opaque.metalness = metalness;
             return *this;
         }
 
@@ -137,9 +137,9 @@ public:
             Color f0 = Color::lerp(
                 { 0.04F, 0.04F, 0.04F },
                 _albedo,
-                _metalness
+                _opaque.metalness
             );
-            return Material(_albedo, f0, _roughness, Opaque { _metalness });
+            return Material(_albedo, f0, _roughness, _opaque);
         }
 
     };
@@ -148,14 +148,12 @@ public:
     class TransparentBuilder final : public Builder<TransparentBuilder> {
     private:
 
-        /** @brief The transparency of the material. */
-        f32 _transparency = DEFAULT_TRANSPARENCY;
-
-        /** @brief The index of refraction of the material. */
-        f32 _ior = DEFAULT_IOR;
-
-        /** @brief The absorption of the material. */
-        Color _absorption = DEFAULT_ABSORPTION;
+        /** @brief The properties of the material. */
+        Transparent _transparent = {
+            .transparency = DEFAULT_TRANSPARENCY,
+            .ior = DEFAULT_IOR,
+            .absorption = DEFAULT_ABSORPTION
+        };
 
     public:
 
@@ -170,7 +168,7 @@ public:
          */
         constexpr TransparentBuilder& transparency(f32 transparency) noexcept {
             assert((transparency >= 0.0F) && (transparency <= 1.0F));
-            _transparency = transparency;
+            _transparent.transparency = transparency;
             return *this;
         }
 
@@ -184,7 +182,7 @@ public:
          */
         constexpr TransparentBuilder& ior(f32 ior) noexcept {
             assert(ior >= 1.0F);
-            _ior = ior;
+            _transparent.ior = ior;
             return *this;
         }
 
@@ -195,13 +193,13 @@ public:
          * @return A reference to this builder.
          *
          * @warning The behavior is undefined if any component of `absorption`
-         * is outside the range `[0.0F, 1.0F]`.
+         * is negative.
          */
         constexpr TransparentBuilder& absorption(
             const Color& absorption
         ) noexcept {
-            assert((absorption.min() >= 0.0F) && (absorption.max() <= 1.0F));
-            _absorption = absorption;
+            assert(absorption.min() >= 0.0F);
+            _transparent.absorption = absorption;
             return *this;
         }
 
@@ -211,15 +209,10 @@ public:
          * @return The transparent material.
          */
         constexpr Material build() const noexcept {
-            f32 x = (_ior - 1.0F) / (_ior + 1.0F);
+            f32 x = (_transparent.ior - 1.0F) / (_transparent.ior + 1.0F);
             x = x * x;
             Color f0 = { x, x, x };
-            return Material(
-                _albedo,
-                f0,
-                _roughness,
-                Transparent { _transparency, _ior, _absorption }
-            );
+            return Material(_albedo, f0, _roughness, _transparent);
         }
 
     };
@@ -260,7 +253,7 @@ private:
 public:
 
     /**
-     * @brief Creates a builder for an opaque material.
+     * @brief Constructs a builder for an opaque material.
      *
      * @return A builder for an opaque material.
      */
@@ -269,7 +262,7 @@ public:
     }
 
     /**
-     * @brief Creates a builder for a transparent material.
+     * @brief Constructs a builder for a transparent material.
      *
      * @return A builder for a transparent material.
      */

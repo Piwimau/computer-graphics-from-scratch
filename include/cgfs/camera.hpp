@@ -5,19 +5,29 @@
 #include <cassert>
 #include <cmath>
 #include "cgfs/quat.hpp"
-#include "cgfs/space.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/util.hpp"
 #include "cgfs/vec3.hpp"
 
 namespace cgfs {
 
+/** @brief A coordinate space. */
+enum class Space {
+
+    /** @brief Indicates that coordinates are in view space. */
+    VIEW,
+
+    /** @brief Indicates that coordinates are in world space. */
+    WORLD
+
+};
+
 /** @brief An adjustable camera. */
 class Camera final {
 public:
 
     /** @brief The default position of the camera in world space. */
-    static constexpr Vec3<f32> DEFAULT_POSITION = cgfs::Vec3<f32>::splat(0.0F);
+    static constexpr Vec3<f32> DEFAULT_POSITION = Vec3<f32>::splat(0.0F);
 
     /** @brief The default viewing direction of the camera in world space. */
     static constexpr Vec3<f32> DEFAULT_DIRECTION = { 0.0F, 0.0F, -1.0F };
@@ -37,7 +47,7 @@ public:
     /** @brief The default maximum pitch angle (in radians). */
     static constexpr f32 DEFAULT_MAX_PITCH = cgfs::radians(89.0F);
 
-    /** @brief A builder for configuring and creating a camera. */
+    /** @brief A builder for a camera. */
     class Builder final {
     private:
 
@@ -258,9 +268,9 @@ private:
 public:
 
     /**
-     * @brief Returns a camera builder.
+     * @brief Constructs a builder for a camera.
      *
-     * @return A camera builder.
+     * @return A builder for a camera.
      */
     static constexpr Builder builder() noexcept {
         return Builder();

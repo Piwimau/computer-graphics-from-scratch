@@ -8,7 +8,7 @@
 
 namespace cgfs {
 
-/** @brief A scene containing spheres, lights, and a camera. */
+/** @brief A scene to be rendered. */
 struct Scene {
 
     /** @brief The spheres positioned in this scene. */

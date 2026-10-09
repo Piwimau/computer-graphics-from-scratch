@@ -21,7 +21,7 @@ struct Color {
     f32 b;
 
     /**
-     * @brief Creates a color with all components set to a specified value.
+     * @brief Constructs a color with all components set to a specified value.
      *
      * @param[in] value The value for all components.
      * @return A color with all components set to the specified value.

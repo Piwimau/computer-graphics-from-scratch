@@ -40,8 +40,8 @@ static constexpr Scene make_scene() {
                 .radius = 1.0F,
                 .material = Material::opaque()
                     .albedo({ 0.0F, 1.0F, 0.0F })
-                    .roughness(0.25F)
                     .metalness(0.25F)
+                    .roughness(0.25F)
                     .build()
             },
             {
@@ -58,8 +58,8 @@ static constexpr Scene make_scene() {
                 .radius = 1.0F,
                 .material = Material::opaque()
                     .albedo({ 0.0F, 0.0F, 1.0F })
-                    .roughness(0.35F)
                     .metalness(0.25F)
+                    .roughness(0.35F)
                     .build()
             },
             {
@@ -67,8 +67,8 @@ static constexpr Scene make_scene() {
                 .radius = 50.0F,
                 .material = Material::opaque()
                     .albedo({ 1.0F, 1.0F, 0.0F })
-                    .roughness(0.25F)
-                    .metalness(0.25F)
+                    .metalness(0.0F)
+                    .roughness(0.6F)
                     .build()
             }
         },
