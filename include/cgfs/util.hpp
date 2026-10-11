@@ -1,12 +1,27 @@
 #ifndef CGFS_UTIL_HPP
 #define CGFS_UTIL_HPP
 
-#include <cmath>
 #include <concepts>
+#include <limits>
 #include <numbers>
-#include "cgfs/types.hpp"
 
 namespace cgfs {
+
+/**
+ * @brief The value of pi.
+ *
+ * @tparam T The desired type.
+ */
+template<std::floating_point T>
+constexpr inline T PI = std::numbers::pi_v<T>;
+
+/**
+ * @brief The value of infinity.
+ *
+ * @tparam The desired type.
+ */
+template<std::floating_point T>
+constexpr inline T INF = std::numeric_limits<T>::infinity();
 
 /**
  * @brief Converts an angle from degrees to radians.
@@ -17,7 +32,7 @@ namespace cgfs {
  */
 template<std::floating_point T>
 constexpr T radians(T degrees) noexcept {
-    return degrees * std::numbers::pi_v<T> / static_cast<T>(180);
+    return degrees * PI<T> / static_cast<T>(180);
 }
 
 /**
@@ -29,7 +44,7 @@ constexpr T radians(T degrees) noexcept {
  */
 template<std::floating_point T>
 constexpr T degrees(T radians) noexcept {
-    return radians * static_cast<T>(180) / std::numbers::pi_v<T>;
+    return radians * static_cast<T>(180) / PI<T>;
 }
 
 }

@@ -52,10 +52,10 @@ public:
         Vec3<f32> direction;
 
         /** @brief The cosine of the inner cutoff angle (in radians). */
-        f32 innerCutoff;
+        f32 cosInnerCutoff;
 
         /** @brief The cosine of the outer cutoff angle (in radians). */
-        f32 outerCutoff;
+        f32 cosOuterCutoff;
 
         /** @brief The radius. */
         f32 radius;
@@ -72,7 +72,7 @@ public:
         Vec3<f32> direction;
 
         /** @brief The cosine of the angular radius (in radians). */
-        f32 angularRadius;
+        f32 cosAngularRadius;
 
     };
 
@@ -236,8 +236,8 @@ public:
         Spot _spot = {
             .position = DEFAULT_POSITION,
             .direction = DEFAULT_DIRECTION,
-            .innerCutoff = std::cos(DEFAULT_INNER_CUTOFF),
-            .outerCutoff = std::cos(DEFAULT_OUTER_CUTOFF),
+            .cosInnerCutoff = std::cos(DEFAULT_INNER_CUTOFF),
+            .cosOuterCutoff = std::cos(DEFAULT_OUTER_CUTOFF),
             .radius = DEFAULT_RADIUS,
             .attenuation = DEFAULT_ATTENUATION
         };
@@ -295,8 +295,8 @@ public:
                 (outerCutoff > 0.0F) && (outerCutoff < cgfs::radians(180.0F))
             );
             assert(innerCutoff <= outerCutoff);
-            _spot.innerCutoff = std::cos(innerCutoff);
-            _spot.outerCutoff = std::cos(outerCutoff);
+            _spot.cosInnerCutoff = std::cos(innerCutoff);
+            _spot.cosOuterCutoff = std::cos(outerCutoff);
             return *this;
         }
 
@@ -351,7 +351,7 @@ public:
         /** @brief The properties of the light. */
         Directional _directional = {
             .direction = DEFAULT_DIRECTION,
-            .angularRadius = std::cos(DEFAULT_ANGULAR_RADIUS)
+            .cosAngularRadius = std::cos(DEFAULT_ANGULAR_RADIUS)
         };
 
     public:
@@ -389,7 +389,7 @@ public:
                 (angularRadius >= 0.0F)
                     && (angularRadius < cgfs::radians(90.0F))
             );
-            _directional.angularRadius = std::cos(angularRadius);
+            _directional.cosAngularRadius = std::cos(angularRadius);
             return *this;
         }
 
@@ -487,7 +487,7 @@ public:
      * @brief Tries to get the point light properties.
      *
      * @return The point light properties if this light is a point light,
-     * otherwise `nullptr`.
+     * `nullptr` otherwise.
      */
     constexpr const Point* as_point() const noexcept {
         return std::get_if<Point>(&_kind);
@@ -497,7 +497,7 @@ public:
      * @brief Tries to get the spot light properties.
      *
      * @return The spot light properties if this light is a spot light,
-     * otherwise `nullptr`.
+     * `nullptr` otherwise.
      */
     constexpr const Spot* as_spot() const noexcept {
         return std::get_if<Spot>(&_kind);
@@ -507,7 +507,7 @@ public:
      * @brief Tries to get the directional light properties.
      *
      * @return The directional light properties if this light is a directional
-     * light, otherwise `nullptr`.
+     * light, `nullptr` otherwise.
      */
     constexpr const Directional* as_directional() const noexcept {
         return std::get_if<Directional>(&_kind);

@@ -285,6 +285,15 @@ struct Vec3 {
     }
 
     /**
+     * @brief Returns the squared euclidean norm (or magnitude) of this vector.
+     *
+     * @return The squared euclidean norm (or magnitude) of this vector.
+     */
+    constexpr T norm_squared() const noexcept {
+        return dot(*this);
+    }
+
+    /**
      * @brief Returns the angle between this vector and another vector (in
      * radians).
      *

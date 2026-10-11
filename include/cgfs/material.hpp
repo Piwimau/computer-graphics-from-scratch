@@ -43,6 +43,9 @@ public:
     /** @brief The default roughness for a material. */
     static constexpr f32 DEFAULT_ROUGHNESS = 1.0F;
 
+    /** @brief The default emission for a material. */
+    static constexpr Color DEFAULT_EMISSION = Color::splat(0.0F);
+
     /** @brief The default metalness for an opaque material. */
     static constexpr f32 DEFAULT_METALNESS = 0.0F;
 
@@ -69,6 +72,9 @@ public:
 
         /** @brief The roughness of the material. */
         f32 _roughness = DEFAULT_ROUGHNESS;
+
+        /** @brief The emission of the material. */
+        Color _emission = DEFAULT_EMISSION;
 
     public:
 
@@ -99,6 +105,21 @@ public:
         constexpr Derived& roughness(f32 roughness) noexcept {
             assert((roughness >= 0.0F) && (roughness <= 1.0F));
             _roughness = roughness;
+            return static_cast<Derived&>(*this);
+        }
+
+        /**
+         * @brief Sets the emission of the material.
+         *
+         * @param[in] emission The emission of the material.
+         * @return A reference to this builder.
+         *
+         * @warning The behavior is undefined if any component of `emission` is
+         * negative.
+         */
+        constexpr Derived& emission(const Color& emission) noexcept {
+            assert(emission.min() >= 0.0F);
+            _emission = emission;
             return static_cast<Derived&>(*this);
         }
 
@@ -139,7 +160,7 @@ public:
                 _albedo,
                 _opaque.metalness
             );
-            return Material(_albedo, f0, _roughness, _opaque);
+            return Material(_albedo, f0, _roughness, _emission, _opaque);
         }
 
     };
@@ -212,7 +233,7 @@ public:
             f32 x = (_transparent.ior - 1.0F) / (_transparent.ior + 1.0F);
             x = x * x;
             Color f0 = { x, x, x };
-            return Material(_albedo, f0, _roughness, _transparent);
+            return Material(_albedo, f0, _roughness, _emission, _transparent);
         }
 
     };
@@ -228,6 +249,9 @@ private:
     /** @brief The roughness. */
     f32 _roughness;
 
+    /** @brief The emission. */
+    Color _emission;
+
     /** @brief The kind. */
     Kind _kind;
 
@@ -237,17 +261,20 @@ private:
      * @param[in] albedo    The base color of the material.
      * @param[in] f0        The reflectance of the material at normal incidence.
      * @param[in] roughness The roughness of the material.
+     * @param[in] emission  The emission of the material.
      * @param[in] kind      The kind of the material.
      */
     constexpr Material(
         const Color& albedo,
         const Color& f0,
         f32 roughness,
+        const Color& emission,
         const Kind& kind
     ) noexcept
         : _albedo(albedo),
           _f0(f0),
           _roughness(roughness),
+          _emission(emission),
           _kind(kind) { }
 
 public:
@@ -289,12 +316,34 @@ public:
     }
 
     /**
+     * @brief Returns the diffuse color of this material.
+     *
+     * @return The diffuse color of this material.
+     */
+    constexpr Color diffuse() const noexcept {
+        Color diffuse = albedo();
+        if (is_opaque()) {
+            diffuse *= (1.0F - as_opaque()->metalness);
+        }
+        return diffuse;
+    }
+
+    /**
      * @brief Returns the roughness of this material.
      *
      * @return The roughness of this material.
      */
     constexpr f32 roughness() const noexcept {
         return _roughness;
+    }
+
+    /**
+     * @brief Returns the emission of this material.
+     *
+     * @return The emission of this material.
+     */
+    constexpr const Color& emission() const noexcept {
+        return _emission;
     }
 
     /**
@@ -309,8 +358,8 @@ public:
     /**
      * @brief Tries to get the opaque properties of this material.
      *
-     * @return The opaque properties if this material is opaque, otherwise
-     * `nullptr`.
+     * @return The opaque properties if this material is opaque, `nullptr`
+     * otherwise.
      */
     constexpr const Opaque* as_opaque() const noexcept {
         return std::get_if<Opaque>(&_kind);
@@ -320,10 +369,37 @@ public:
      * @brief Tries to get the transparent properties of this material.
      *
      * @return The transparent properties if this material is transparent,
-     * otherwise `nullptr`.
+     * `nullptr` otherwise.
      */
     constexpr const Transparent* as_transparent() const noexcept {
         return std::get_if<Transparent>(&_kind);
+    }
+
+    /**
+     * @brief Determines if this material is emissive.
+     *
+     * @return `true` if this material is emissive, `false` otherwise.
+     */
+    constexpr bool is_emissive() const noexcept {
+        return _emission.max() > 0.0F;
+    }
+
+    /**
+     * @brief Determines if this material is opaque.
+     *
+     * @return `true` if this material is opaque, `false` otherwise.
+     */
+    constexpr bool is_opaque() const noexcept {
+        return std::holds_alternative<Opaque>(_kind);
+    }
+
+    /**
+     * @brief Determines if this material is transparent.
+     *
+     * @return `true` if this material is transparent, `false` otherwise.
+     */
+    constexpr bool is_transparent() const noexcept {
+        return std::holds_alternative<Transparent>(_kind);
     }
 
 };
