@@ -82,7 +82,7 @@ static constexpr Scene make_scene() {
  * @param[in, out] deltaTimer The timer used to measure the delta time.
  * @param[in, out] camera     The camera through which the scene is viewed.
  * @param[in, out] film       The film to render the scene to.
- * @return `true` if the application should continue, otherwise `false`.
+ * @return `true` if the application should continue, `false` otherwise.
  */
 static bool handle_events_and_inputs(
     SdlDeltaTimer& deltaTimer,
@@ -166,7 +166,11 @@ int main() {
             window.fill(film);
             if (std::optional<f64> fps = fpsCounter.tick()) {
                 window.set_title(
-                    std::format("Basic Pathtracing – {:.1F} FPS", *fps).c_str()
+                    std::format(
+                        "Basic Pathtracing | {} Frames | {:.1F} FPS",
+                        film.frames(),
+                        *fps
+                    )
                 );
             }
         }

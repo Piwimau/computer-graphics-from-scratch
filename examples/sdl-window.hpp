@@ -5,6 +5,7 @@
 #include <cassert>
 #include <memory>
 #include <span>
+#include <string>
 #include "cgfs/film.hpp"
 #include "cgfs/types.hpp"
 #include "sdl-deleter.hpp"
@@ -38,24 +39,22 @@ public:
      *
      * @throws `SdlError` Thrown when an SDL operation fails.
      *
-     * @warning The behavior is undefined if `title` is `nullptr`, or if `width`
-     * or `height` is negative.
+     * @warning The behavior is undefined if `width` or `height` is negative.
      */
     SdlWindow(
-        const char* title,
+        const std::string& title,
         int width,
         int height,
         bool vsync = true,
         u64 flags = 0
     ) {
-        assert(title != nullptr);
         assert(width >= 0);
         assert(height >= 0);
         SDL_Window* window;
         SDL_Renderer* renderer;
         sdl_check(
             SDL_CreateWindowAndRenderer(
-                title,
+                title.c_str(),
                 width,
                 height,
                 flags,
@@ -119,8 +118,8 @@ public:
      *
      * @throws `SdlError` Thrown when an SDL operation fails.
      */
-    void set_title(const char* title) {
-        sdl_check(SDL_SetWindowTitle(_window.get(), title));
+    void set_title(const std::string& title) {
+        sdl_check(SDL_SetWindowTitle(_window.get(), title.c_str()));
     }
 
 };
