@@ -44,15 +44,18 @@ static constexpr f32 SPHERE_RADIUS = 0.5F;
 
 static constexpr Scene make_scene() {
     Scene scene = {
+        .materials = {
+            Material::opaque()
+                .albedo({ 0.6F, 0.6F, 0.6F })
+                .metalness(0.0F)
+                .roughness(0.6F)
+                .build()
+        },
         .spheres = {
             {
                 .center = { 0.0F, -FLOOR_RADIUS - SPHERE_RADIUS, 0.0F },
                 .radius = FLOOR_RADIUS,
-                .material = Material::opaque()
-                    .albedo({ 0.6F, 0.6F, 0.6F })
-                    .metalness(0.0F)
-                    .roughness(0.6F)
-                    .build()
+                .materialIdx = 0
             }
         },
         .lights = {
@@ -74,6 +77,13 @@ static constexpr Scene make_scene() {
         for (isize x = 0; x < GRID_SIZE; x++) {
             f32 roughness = static_cast<f32>(x)
                 / static_cast<f32>(GRID_SIZE - 1);
+            scene.materials.push_back(
+                Material::opaque()
+                    .albedo({ 0.9F, 0.65F, 0.2F })
+                    .metalness(metalness)
+                    .roughness(roughness)
+                    .build()
+            );
             scene.spheres.emplace_back(
                 Vec3<f32> {
                     .x = (static_cast<f32>(x) - (GRID_SIZE - 1) / 2.0F)
@@ -83,11 +93,7 @@ static constexpr Scene make_scene() {
                         * GRID_SPACING
                 },
                 SPHERE_RADIUS,
-                Material::opaque()
-                    .albedo({ 0.9F, 0.65F, 0.2F })
-                    .metalness(metalness)
-                    .roughness(roughness)
-                    .build()
+                std::ssize(scene.materials) - 1
             );
         }
     }

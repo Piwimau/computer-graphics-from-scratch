@@ -32,40 +32,44 @@ static constexpr f32 SPRINT_SPEED = 15.0F;
 
 static constexpr Scene make_scene() {
     return {
+        .materials = {
+            Material::opaque()
+                .albedo({ 1.0F, 1.0F, 1.0F })
+                .metalness(0.95F)
+                .roughness(0.05F)
+                .build(),
+            Material::opaque()
+                .albedo({ 1.0F, 0.0F, 0.0F })
+                .metalness(0.25F)
+                .roughness(0.25F)
+                .build(),
+            Material::opaque()
+                .albedo({ 0.0F, 1.0F, 0.0F })
+                .metalness(0.5F)
+                .roughness(0.25F)
+                .build(),
+            Material::opaque().albedo({ 1.0F, 1.0F, 0.0F }).build()
+        },
         .spheres = {
             {
                 .center = { -2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
-                .material = Material::opaque()
-                    .albedo({ 1.0F, 1.0F, 1.0F })
-                    .metalness(0.95F)
-                    .roughness(0.05F)
-                    .build()
+                .materialIdx = 0
             },
             {
                 .center = { 0.0F, -1.0F, -3.0F },
                 .radius = 1.0F,
-                .material = Material::opaque()
-                    .albedo({ 1.0F, 0.0F, 0.0F })
-                    .metalness(0.25F)
-                    .roughness(0.25F)
-                    .build()
+                .materialIdx = 1
             },
             {
                 .center = { 2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
-                .material = Material::opaque()
-                    .albedo({ 0.0F, 1.0F, 0.0F })
-                    .metalness(0.5F)
-                    .roughness(0.25F)
-                    .build()
+                .materialIdx = 2
             },
             {
                 .center = { 0.0F, -251.0F, 0.0F },
                 .radius = 250.0F,
-                .material = Material::opaque()
-                    .albedo({ 1.0F, 1.0F, 0.0F })
-                    .build()
+                .materialIdx = 3
             }
         },
         .lights = {
