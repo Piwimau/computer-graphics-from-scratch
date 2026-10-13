@@ -3,18 +3,97 @@
 #include <cmath>
 #include <optional>
 #include <random>
+#include <ranges>
+#include <span>
+#include <vector>
 #include "cgfs/color.hpp"
 #include "cgfs/pathtracer.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/util.hpp"
 #include "cgfs/vec3.hpp"
-#include "cone.hpp"
 #include "dielectric-bsdf.hpp"
 #include "medium-stack.hpp"
 #include "microfacet-bsdf.hpp"
 #include "prng.hpp"
+#include "sampling.hpp"
 
 namespace cgfs {
+
+/** @brief Information about a scene suitable for path tracing. */
+struct SceneInfo {
+
+    /** @brief The materials in the scene. */
+    std::vector<Material> materials;
+
+    /**
+     * @brief The spheres in the scene.
+     *
+     * @note This vector is ordered such that opaque spheres come before
+     * transparent spheres.
+     */
+    std::vector<Sphere> spheres;
+
+    /** @brief The number of opaque spheres in the scene. */
+    isize numOpaqueSpheres;
+
+    /** @brief The indices of the emissive spheres in the scene. */
+    std::vector<isize> emissiveSpheresIndices;
+
+    /** @brief The lights in the scene. */
+    std::vector<Light> lights;
+
+    /**
+     * @brief Collects information about a scene suitable for path tracing.
+     *
+     * @param[in] scene The scene to collect information from.
+     * @return Information about the scene suitable for path tracing.
+     */
+    static constexpr SceneInfo from(const Scene& scene) {
+        SceneInfo sceneInfo;
+        sceneInfo.materials = scene.materials;
+        sceneInfo.numOpaqueSpheres = 0;
+        for (const Sphere& sphere : scene.spheres) {
+            const Material& material = sceneInfo.materials[sphere.materialIdx];
+            if (material.is_opaque()) {
+                sceneInfo.spheres.push_back(sphere);
+                sceneInfo.numOpaqueSpheres++;
+            }
+        }
+        for (const Sphere& sphere : scene.spheres) {
+            const Material& material = sceneInfo.materials[sphere.materialIdx];
+            if (material.is_transparent()) {
+                sceneInfo.spheres.push_back(sphere);
+            }
+        }
+        for (auto [idx, sphere] : std::views::enumerate(sceneInfo.spheres)) {
+            const Material& material = sceneInfo.materials[sphere.materialIdx];
+            if (material.is_emissive()) {
+                sceneInfo.emissiveSpheresIndices.push_back(idx);
+            }
+        }
+        sceneInfo.lights = scene.lights;
+        return sceneInfo;
+    }
+
+    /**
+     * @brief Returns a view of the opaque spheres in the scene.
+     *
+     * @return A view of the opaque spheres in the scene.
+     */
+    constexpr auto opaque_spheres() const {
+        return std::views::take(spheres, numOpaqueSpheres);
+    }
+
+    /**
+     * @brief Returns a view of the transparent spheres in the scene.
+     *
+     * @return A view of the transparent spheres in the scene.
+     */
+    constexpr auto transparent_spheres() const {
+        return std::views::drop(spheres, numOpaqueSpheres);
+    }
+
+};
 
 /** @brief A ray. */
 struct Ray {
@@ -42,8 +121,8 @@ struct Hit {
     /** @brief The surface normal at the hit. */
     Vec3<f32> normal;
 
-    /** @brief The sphere that was hit. */
-    const Sphere& sphere;
+    /** @brief The index of the sphere that was hit. */
+    isize idx;
 
     /** @brief Whether the ray hit the sphere from outside. */
     bool entering;
@@ -71,10 +150,10 @@ struct LightSample {
 };
 
 /** @brief The maximum number of bounces per path. */
-static constexpr isize MAX_DEPTH = 32;
+static constexpr isize MAX_DEPTH = 16;
 
 /** @brief The bounce after which russian roulette starts. */
-static constexpr isize RUSSIAN_ROULETTE_DEPTH = 3;
+static constexpr isize RUSSIAN_ROULETTE_DEPTH = 2;
 
 /** @brief The minimum survival probability of russian roulette. */
 static constexpr f32 MIN_SURVIVAL = 0.05F;
@@ -133,38 +212,64 @@ static constexpr std::optional<f32> intersect_sphere(
 }
 
 /**
- * @brief Tries to intersect a ray with the scene.
+ * @brief Constructs a hit for a ray-sphere intersection.
  *
- * @param[in] scene The scene to test for intersection.
- * @param[in] ray   The ray to test for intersection.
+ * @param[in] ray      The ray that intersected the sphere.
+ * @param[in] sphere   The sphere that was intersected.
+ * @param[in] idx      The index of the sphere that was intersected.
+ * @param[in] distance The distance along the ray to the hit.
+ * @return A hit representing the intersection.
+ */
+static constexpr Hit make_hit(
+    const Ray& ray,
+    const Sphere& sphere,
+    isize idx,
+    f32 distance
+) noexcept {
+    Vec3<f32> position = ray.origin + ray.direction * distance;
+    Vec3<f32> outwards = (position - sphere.center) * (1.0F / sphere.radius);
+    position = sphere.center + outwards * sphere.radius;
+    bool entering = ray.direction.dot(outwards) < 0.0F;
+    return {
+        .distance = distance,
+        .position = position,
+        .normal = entering ? outwards : -outwards,
+        .idx = idx,
+        .entering = entering
+    };
+}
+
+/**
+ * @brief Tries to intersect a ray with a set of spheres.
+ *
+ * @tparam Spheres The type of the container holding the spheres.
+ * @param[in] spheres The set of spheres to test for intersection.
+ * @param[in] ray     The ray to test for intersection.
+ * @param[in] offset  The offset to add to the index of the intersected sphere.
  * @return The intersection between the ray and the closest sphere, or
  * `std::nullopt` if no intersection exists.
  */
-static constexpr std::optional<Hit> intersect_scene(
-    const Scene& scene,
-    Ray ray
+static constexpr std::optional<Hit> intersect_spheres(
+    std::span<const Sphere> spheres,
+    Ray ray,
+    isize offset = 0
 ) noexcept {
-    const Sphere* closest = nullptr;
-    for (const Sphere& sphere : scene.spheres) {
-        if (std::optional<f32> t = intersect_sphere(sphere, ray)) {
-            closest = &sphere;
-            ray.maxDistance = *t;
+    isize closestIdx = -1;
+    for (auto [idx, sphere] : std::views::enumerate(spheres)) {
+        if (std::optional<f32> distance = intersect_sphere(sphere, ray)) {
+            closestIdx = idx;
+            ray.maxDistance = *distance;
         }
     }
-    if (!closest) {
+    if (closestIdx == -1) {
         return std::nullopt;
     }
-    Vec3<f32> position = ray.origin + ray.direction * ray.maxDistance;
-    Vec3<f32> outwards = (position - closest->center).normalize();
-    position = closest->center + outwards * closest->radius;
-    bool entering = ray.direction.dot(outwards) < 0.0F;
-    return Hit {
-        .distance = ray.maxDistance,
-        .position = position,
-        .normal = entering ? outwards : -outwards,
-        .sphere = *closest,
-        .entering = entering
-    };
+    return make_hit(
+        ray,
+        spheres[closestIdx],
+        closestIdx + offset,
+        ray.maxDistance
+    );
 }
 
 /**
@@ -204,33 +309,46 @@ static constexpr Vec3<f32> offset_origin(
 /**
  * @brief Returns the fraction of light that survives a shadow ray.
  *
- * @param[in] scene The scene to test for shadow ray intersections.
- * @param[in] media The media through which the shadow ray travels.
- * @param[in] ray   The shadow ray.
+ * @param[in] sceneInfo The scene information.
+ * @param[in] media     The media through which the shadow ray travels.
+ * @param[in] ray       The shadow ray.
  * @return The fraction of light that survives the shadow ray.
  */
 static constexpr Color shadow_transmittance(
-    const Scene& scene,
+    const SceneInfo& sceneInfo,
     MediumStack media,
     Ray ray
 ) noexcept {
+    // Quickly test for intersections with opaque spheres, which fully block
+    // the shadow ray, allowing us to skip more expensive calculations.
+    for (const Sphere& sphere : sceneInfo.opaque_spheres()) {
+        if (intersect_sphere(sphere, ray)) {
+            return Color::splat(0.0F);
+        }
+    }
     Color transmittance = Color::splat(1.0F);
     for (isize i = 0; i < MAX_SHADOW_CROSSINGS; i++) {
-        std::optional<Hit> hit = intersect_scene(scene, ray);
+        std::optional<Hit> hit = intersect_spheres(
+            sceneInfo.transparent_spheres(),
+            ray,
+            sceneInfo.numOpaqueSpheres
+        );
         if (!hit) {
             return transmittance * media.transmittance(ray.maxDistance);
         }
-        const auto& [distance, position, normal, sphere, entering] = *hit;
-        if (!sphere.material.is_transparent()) {
-            return Color::splat(0.0F);
-        }
+        const auto& [distance, position, normal, idx, entering] = *hit;
+        const Sphere& sphere = sceneInfo.spheres[idx];
+        const Material& material = sceneInfo.materials[sphere.materialIdx];
         transmittance *= media.transmittance(distance);
-        auto transparent = sphere.material.as_transparent();
-        auto [etaI, etaT] = media.iors(sphere, entering);
-        DielectricBsdf bsdf(normal, -ray.direction, etaI / etaT);
+        auto transparent = material.as_transparent();
+        DielectricBsdf bsdf(
+            normal,
+            -ray.direction,
+            media.eta(idx, *transparent, entering)
+        );
         transmittance *= transparent->transparency
             * bsdf.straight_transmittance();
-        media.transition(sphere, entering);
+        media.transition(idx, *transparent, entering);
         ray.origin = offset_origin(position, normal, ray.direction);
         ray.maxDistance -= distance;
     }
@@ -252,22 +370,24 @@ static constexpr std::optional<LightSample> sample_sphere(
     const Vec3<f32>& center,
     f32 radius,
     const Vec3<f32>& position,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     Vec3<f32> axis = center - position;
-    if (axis.norm_squared() <= radius * radius) {
+    f32 distanceSquared = axis.norm_squared();
+    f32 radiusSquared = radius * radius;
+    if (distanceSquared <= radiusSquared) {
         return std::nullopt;
     }
-    Cone cone = Cone::from(center, radius, position);
-    Vec3<f32> direction = cone.sample(prng);
-    f32 distance = axis.norm();
-    f32 b = distance * direction.dot(cone.axis);
-    f32 d = b * b - (distance * distance - radius * radius);
+    f32 distance = std::sqrt(distanceSquared);
+    f32 versine = sphere_versine(distanceSquared, radius);
+    Vec3<f32> direction = sample_cone(axis * (1.0F / distance), versine, prng);
+    f32 b = direction.dot(axis);
+    f32 d = b * b - (distanceSquared - radiusSquared);
     return LightSample {
         .direction = direction,
         .distance = b - std::sqrt(std::max(d, 0.0F)),
         .radiance = Color::splat(1.0F),
-        .pdf = cone.pdf()
+        .pdf = cone_pdf(versine)
     };
 }
 
@@ -286,12 +406,12 @@ static constexpr LightSample sample_spherical_light(
     f32 radius,
     const Light::Attenuation& attenuation,
     const Vec3<f32>& position,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     Vec3<f32> axis = light - position;
     f32 distance = axis.norm();
     LightSample result = {
-        .direction = axis / distance,
+        .direction = axis * (1.0F / distance),
         .distance = distance,
         .radiance = Color::splat(1.0F),
         .pdf = std::nullopt
@@ -303,7 +423,7 @@ static constexpr LightSample sample_spherical_light(
         }
     }
     const auto& [c, l, q] = attenuation;
-    result.radiance /= c + l * distance + q * distance * distance;
+    result.radiance *= 1.0F / (c + l * distance + q * distance * distance);
     return result;
 }
 
@@ -318,7 +438,7 @@ static constexpr LightSample sample_spherical_light(
 static constexpr LightSample sample_light(
     const Light::Point& point,
     const Vec3<f32>& position,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     return sample_spherical_light(
         point.position,
@@ -340,7 +460,7 @@ static constexpr LightSample sample_light(
 static constexpr LightSample sample_light(
     const Light::Spot& spot,
     const Vec3<f32>& position,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     LightSample sample = sample_spherical_light(
         spot.position,
@@ -371,12 +491,15 @@ static constexpr LightSample sample_light(
 static constexpr LightSample sample_light(
     const Light::Directional& directional,
     [[maybe_unused]] const Vec3<f32>& position,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     Vec3<f32> direction = -directional.direction;
     if (directional.cosAngularRadius < 1.0F) {
-        Cone cone = Cone::from(direction, directional.cosAngularRadius);
-        direction = cone.sample(prng);
+        direction = sample_cone(
+            direction,
+            1.0F - directional.cosAngularRadius,
+            prng
+        );
     }
     return {
         .direction = direction,
@@ -387,72 +510,33 @@ static constexpr LightSample sample_light(
 }
 
 /**
- * @brief Samples a light.
- *
- * @param[in]      light    The light to sample.
- * @param[in]      position The position at which to sample.
- * @param[in, out] prng     A pseudorandom number generator.
- * @return The sample of the light.
- */
-static constexpr LightSample sample_light(
-    const Light& light,
-    const Vec3<f32>& position,
-    Prng& prng
-) noexcept {
-    LightSample sample = std::visit(
-        [&](const auto& kind) { return sample_light(kind, position, prng); },
-        light.kind()
-    );
-    sample.radiance *= light.color() * light.intensity();
-    return sample;
-}
-
-/**
- * @brief Samples an emissive sphere.
- *
- * @param[in]      sphere   The emissive sphere.
- * @param[in]      position The position at which to sample.
- * @param[in, out] prng     A pseudorandom number generator.
- * @return The sample of the emissive sphere, or `std::nullopt` if the
- * position is inside the sphere.
- */
-static constexpr std::optional<LightSample> sample_emissive_sphere(
-    const Sphere& sphere,
-    const Vec3<f32>& position,
-    Prng& prng
-) noexcept {
-    std::optional<LightSample> sample = sample_sphere(
-        sphere.center,
-        sphere.radius,
-        position,
-        prng
-    );
-    if (sample) {
-        sample->distance *= 0.999F;
-        sample->radiance = sphere.material.emission();
-    }
-    return sample;
-}
-
-/**
  * @brief Returns the contribution of a light sample.
  *
- * @param[in] scene  The scene containing the lights and objects.
- * @param[in] hit    The hit information.
- * @param[in] media  The media at the hit.
- * @param[in] bsdf   The BSDF at the hit.
- * @param[in] sample The light sample.
+ * @param[in] sceneInfo The scene information.
+ * @param[in] hit       The hit information.
+ * @param[in] media     The media at the hit.
+ * @param[in] bsdf      The BSDF at the hit.
+ * @param[in] sample    The light sample.
  * @return The contribution of the light sample.
  */
 static constexpr Color shade(
-    const Scene& scene,
+    const SceneInfo& sceneInfo,
     const Hit& hit,
     const MediumStack& media,
     const MicrofacetBsdf& bsdf,
     const LightSample& sample
 ) noexcept {
     f32 cosTheta = hit.normal.dot(sample.direction);
-    if (cosTheta <= 0.0F) {
+    if ((cosTheta <= 0.0F) || (sample.radiance.max() <= 0.0F)) {
+        return Color::splat(0.0F);
+    }
+    f32 scale = cosTheta;
+    if (sample.pdf) {
+        scale *= power_heuristic(*sample.pdf, bsdf.pdf(sample.direction))
+            / *sample.pdf;
+    }
+    Color contribution = sample.radiance * bsdf.eval(sample.direction) * scale;
+    if (contribution.max() <= 0.0F) {
         return Color::splat(0.0F);
     }
     Ray shadowRay = {
@@ -460,55 +544,79 @@ static constexpr Color shade(
         .direction = sample.direction,
         .maxDistance = sample.distance
     };
-    Color visibility = shadow_transmittance(scene, media, shadowRay);
-    if (visibility.max() <= 0.0F) {
-        return Color::splat(0.0F);
-    }
-    f32 scale = cosTheta;
-    if (sample.pdf) {
-        scale = cosTheta
-            * power_heuristic(*sample.pdf, bsdf.pdf(sample.direction))
-            / *sample.pdf;
-    }
-    return sample.radiance * visibility * bsdf.eval(sample.direction) * scale;
+    return contribution * shadow_transmittance(sceneInfo, media, shadowRay);
+}
+
+/**
+ * @brief Returns the probability of picking a light.
+ *
+ * @param[in] sceneInfo The scene information.
+ * @return The probability of picking a light.
+ */
+static constexpr f32 light_pick_pdf(const SceneInfo& sceneInfo) noexcept {
+    isize total = std::ssize(sceneInfo.lights)
+        + std::ssize(sceneInfo.emissiveSpheresIndices);
+    return (total > 0) ? 1.0F / static_cast<f32>(total) : 0.0F;
 }
 
 /**
  * @brief Returns the direct lighting at a position.
  *
- * @param[in]      scene The scene containing the lights and objects.
- * @param[in]      hit   The hit information.
- * @param[in]      media The media at the hit.
- * @param[in]      bsdf  The BSDF at the hit.
- * @param[in, out] prng  A pseudorandom number generator.
+ * @param[in]      sceneInfo The scene information.
+ * @param[in]      hit       The hit information.
+ * @param[in]      media     The media at the hit.
+ * @param[in]      bsdf      The BSDF at the hit.
+ * @param[in, out] prng      A pseudorandom number generator.
  * @return The direct lighting at the position.
  */
 static constexpr Color direct_lighting(
-    const Scene& scene,
+    const SceneInfo& sceneInfo,
     const Hit& hit,
     const MediumStack& media,
     const MicrofacetBsdf& bsdf,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
-    Color radiance = Color::splat(0.0F);
-    for (const Light& light : scene.lights) {
-        radiance += shade(
-            scene,
-            hit,
-            media,
-            bsdf,
-            sample_light(light, hit.position, prng)
+    isize lights = std::ssize(sceneInfo.lights);
+    isize totalLights = lights + std::ssize(sceneInfo.emissiveSpheresIndices);
+    if (totalLights == 0) {
+        return Color::splat(0.0F);
+    }
+    f32 pickPdf = light_pick_pdf(sceneInfo);
+    isize pick = std::min(
+        static_cast<isize>(prng.next_f32() * static_cast<f32>(totalLights)),
+        totalLights - 1
+    );
+    if (pick < lights) {
+        const Light& light = sceneInfo.lights[pick];
+        LightSample sample = std::visit(
+            [&](const auto& kind) {
+                return sample_light(kind, hit.position, prng);
+            },
+            light.kind()
         );
+        sample.radiance *= light.color() * light.intensity();
+        return shade(sceneInfo, hit, media, bsdf, sample) * (1.0F / pickPdf);
     }
-    for (const Sphere& sphere : scene.spheres) {
-        if (!sphere.material.is_emissive() || (&sphere == &hit.sphere)) {
-            continue;
-        }
-        if (auto sample = sample_emissive_sphere(sphere, hit.position, prng)) {
-            radiance += shade(scene, hit, media, bsdf, *sample);
-        }
+    isize idx = sceneInfo.emissiveSpheresIndices[pick - lights];
+    if (idx == hit.idx) {
+        return Color::splat(0.0F);
     }
-    return radiance;
+    const Sphere& sphere = sceneInfo.spheres[idx];
+    std::optional<LightSample> sample = sample_sphere(
+        sphere.center,
+        sphere.radius,
+        hit.position,
+        prng
+    );
+    if (!sample) {
+        return Color::splat(0.0F);
+    }
+    sample->distance *= 0.999F;
+    sample->radiance = sceneInfo.materials[sphere.materialIdx].emission();
+    if (sample->pdf) {
+        *sample->pdf *= pickPdf;
+    }
+    return shade(sceneInfo, hit, media, bsdf, *sample);
 }
 
 /**
@@ -527,7 +635,6 @@ static constexpr Color restrict_radiance(
     const Color& radiance,
     isize depth
 ) noexcept {
-    assert(depth >= 0);
     if (depth == 0) {
         return radiance;
     }
@@ -540,50 +647,53 @@ static constexpr Color restrict_radiance(
 /**
  * @brief Traces a ray through a scene, accumulating radiance along the way.
  *
- * @param[in]      scene The scene to trace the ray through.
- * @param[in]      media The media at the ray origin.
- * @param[in]      ray   The ray to trace.
- * @param[in, out] prng  A pseudorandom number generator.
+ * @param[in]      sceneInfo The scene information.
+ * @param[in]      media     The media at the ray origin.
+ * @param[in]      ray       The ray to trace.
+ * @param[in, out] prng      A pseudorandom number generator.
  * @return The accumulated radiance along the ray.
  */
 static constexpr Color trace(
-    const Scene& scene,
+    const SceneInfo& sceneInfo,
     MediumStack media,
     Ray ray,
-    Prng& prng
+    Xoshiro128StarStar& prng
 ) noexcept {
     Color radiance = Color::splat(0.0F);
     Color throughput = Color::splat(1.0F);
     std::optional<f32> previousPdf;
     for (isize depth = 0; depth < MAX_DEPTH; depth++) {
-        std::optional<Hit> hit = intersect_scene(scene, ray);
+        std::optional<Hit> hit = intersect_spheres(sceneInfo.spheres, ray);
         if (!hit) {
             break;
         }
-        const auto& [distance, position, normal, sphere, entering] = *hit;
-        const Material& material = sphere.material;
+        const auto& [distance, position, normal, idx, entering] = *hit;
+        const Sphere& sphere = sceneInfo.spheres[idx];
+        const Material& material = sceneInfo.materials[sphere.materialIdx];
         throughput *= media.transmittance(distance);
         if (entering && material.is_emissive()) {
             f32 weight = 1.0F;
             if (previousPdf) {
-                Cone cone = Cone::from(
-                    sphere.center,
-                    sphere.radius,
-                    ray.origin
+                weight = power_heuristic(
+                    *previousPdf,
+                    sphere_cone_pdf(sphere.center, sphere.radius, ray.origin)
+                        * light_pick_pdf(sceneInfo)
                 );
-                weight = power_heuristic(*previousPdf, cone.pdf());
             }
             radiance += restrict_radiance(
                 throughput * material.emission() * weight,
                 depth
             );
         }
-        std::optional<Bounce> bounce;
+        Bounce bounce;
         Vec3<f32> view = -ray.direction;
         auto transparent = material.as_transparent();
         if (transparent && (prng.next_f32() < transparent->transparency)) {
-            auto [etaI, etaT] = media.iors(sphere, entering);
-            DielectricBsdf bsdf(normal, view, etaI / etaT);
+            DielectricBsdf bsdf(
+                normal,
+                view,
+                media.eta(idx, *transparent, entering)
+            );
             bounce = bsdf.sample(prng);
         }
         else {
@@ -595,15 +705,17 @@ static constexpr Color trace(
                 view
             );
             radiance += restrict_radiance(
-                throughput * direct_lighting(scene, *hit, media, bsdf, prng),
+                throughput
+                    * direct_lighting(sceneInfo, *hit, media, bsdf, prng),
                 depth
             );
-            bounce = bsdf.sample(prng);
+            std::optional<Bounce> temp = bsdf.sample(prng);
+            if (!temp) {
+                break;
+            }
+            bounce = *temp;
         }
-        if (!bounce) {
-            break;
-        }
-        throughput *= bounce->weight;
+        throughput *= bounce.weight;
         f32 throughputMax = throughput.max();
         if (throughputMax <= 0.0F) {
             break;
@@ -613,19 +725,20 @@ static constexpr Color trace(
             if (prng.next_f32() >= survival) {
                 break;
             }
-            throughput /= survival;
+            throughput *= 1.0F / survival;
         }
-        if (bounce->transmitted) {
-            media.transition(sphere, entering);
+        if (bounce.transmitted) {
+            media.transition(idx, *transparent, entering);
         }
-        previousPdf = bounce->pdf;
-        ray.origin = offset_origin(position, normal, bounce->direction);
-        ray.direction = bounce->direction;
+        previousPdf = bounce.pdf;
+        ray.origin = offset_origin(position, normal, bounce.direction);
+        ray.direction = bounce.direction;
     }
     return radiance;
 }
 
 void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
+    SceneInfo sceneInfo = SceneInfo::from(scene);
     f32 width = static_cast<f32>(film.width());
     f32 height = static_cast<f32>(film.height());
     f32 minX = -width / 2.0F;
@@ -633,13 +746,19 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
     f32 scale = 2.0F * std::tan(scene.camera.fov() / 2.0F) / height;
     Mat3<f32> viewToWorld = scene.camera.orientation().to_mat3();
     Vec3<f32> position = scene.camera.position();
-    MediumStack media = MediumStack::initial(scene.spheres, position);
+    MediumStack media = MediumStack::initial(
+        sceneInfo.spheres,
+        sceneInfo.materials,
+        position
+    );
     std::random_device device;
+    u64 baseSeed = (static_cast<u64>(device()) << 32) | device();
     for (isize y = 0; y < film.height(); y++) {
-        u64 seed = (static_cast<u64>(device()) << 32) | device();
+        SplitMix64 splitMix64(baseSeed + y);
+        u64 seed = splitMix64.next();
         threadPool.post(
             [&, y, seed]() {
-                Prng prng(seed);
+                Xoshiro128StarStar prng(seed);
                 for (isize x = 0; x < film.width(); x++) {
                     Vec3<f32> direction = {
                         .x = (minX + static_cast<f32>(x) + prng.next_f32())
@@ -653,7 +772,7 @@ void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
                         .direction = (viewToWorld * direction).normalize(),
                         .maxDistance = INF<f32>
                     };
-                    Color color = trace(scene, media, ray, prng);
+                    Color color = trace(sceneInfo, media, ray, prng);
                     film.add_sample(x, y, color);
                 }
             }

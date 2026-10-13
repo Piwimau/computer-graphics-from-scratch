@@ -304,7 +304,7 @@ struct Quat {
         Vec3<T> rotated = v * (w * w - u.dot(u))
             + static_cast<T>(2) * u * u.dot(v)
             + static_cast<T>(2) * w * u.cross(v);
-        return rotated / dot(*this);
+        return rotated * (1.0F / dot(*this));
     }
 
     /**

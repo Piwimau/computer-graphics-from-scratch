@@ -101,13 +101,13 @@ private:
      * @param[in, out] prng A pseudorandom number generator.
      * @return The sampled bounce.
      */
-    constexpr Bounce sample_diffuse(Prng& prng) const noexcept {
+    constexpr Bounce sample_diffuse(Xoshiro128StarStar& prng) const noexcept {
         Vec3<f32> direction = sample_cosine_hemisphere(_normal, prng);
         Vec3<f32> half = (_view + direction).normalize();
         return {
             .direction = direction,
             .weight = _diffuse * (Color::splat(1.0F) - fresnel(half))
-                / _diffuseProbability,
+                * (1.0F / _diffuseProbability),
             .pdf = pdf(direction),
             .transmitted = false
         };
@@ -120,7 +120,9 @@ private:
      * @param[in, out] prng A pseudorandom number generator.
      * @return A microfacet normal (normalized).
      */
-    constexpr Vec3<f32> sample_ggx_normal(Prng& prng) const noexcept {
+    constexpr Vec3<f32> sample_ggx_normal(
+        Xoshiro128StarStar& prng
+    ) const noexcept {
         Basis basis = Basis::around(_normal);
         Vec3<f32> v = basis.to_local(_view);
         Vec3<f32> stretched = {
@@ -133,7 +135,7 @@ private:
             + stretched.y * stretched.y;
         Vec3<f32> t1 = (lengthSquared > 0.0F)
             ? Vec3<f32> { -stretched.y, stretched.x, 0.0F }
-                / std::sqrt(lengthSquared)
+                * (1.0F / std::sqrt(lengthSquared))
             : Vec3<f32> { 1.0F, 0.0F, 0.0F };
         Vec3<f32> t2 = stretched.cross(t1);
         auto [x, y] = sample_unit_disk(prng);
@@ -169,11 +171,13 @@ private:
      * @param[in, out] prng A pseudorandom number generator.
      * @return The sampled bounce, or `std::nullopt` if it is not usable.
      */
-    constexpr std::optional<Bounce> sample_specular(Prng& prng) const noexcept {
+    constexpr std::optional<Bounce> sample_specular(
+        Xoshiro128StarStar& prng
+    ) const noexcept {
         if (_mirror) {
             return Bounce {
                 .direction = _view.reflect(_normal),
-                .weight = _reflectance / _specularProbability,
+                .weight = _reflectance * (1.0F / _specularProbability),
                 .pdf = std::nullopt,
                 .transmitted = false
             };
@@ -187,7 +191,7 @@ private:
         return Bounce {
             .direction = l,
             .weight = fresnel(h) * (2.0F * nDotL / smith_denominator(nDotL))
-                / _specularProbability,
+                * (1.0F / _specularProbability),
             .pdf = pdf(l),
             .transmitted = false
         };
@@ -242,7 +246,7 @@ public:
     constexpr Color eval(const Vec3<f32>& light) const noexcept {
         Vec3<f32> half = (_view + light).normalize();
         Color f = fresnel(half);
-        Color diffuse = _diffuse * (Color::splat(1.0F) - f) / PI<f32>;
+        Color diffuse = _diffuse * (Color::splat(1.0F) - f) * (1.0F / PI<f32>);
         if (_mirror) {
             return diffuse;
         }
@@ -278,7 +282,9 @@ public:
      * @param[in, out] prng A pseudorandom number generator.
      * @return The sampled bounce, or `std::nullopt` if it is not usable.
      */
-    constexpr std::optional<Bounce> sample(Prng& prng) const noexcept {
+    constexpr std::optional<Bounce> sample(
+        Xoshiro128StarStar& prng
+    ) const noexcept {
         if ((_diffuseProbability <= 0.0F) && (_specularProbability <= 0.0F)) {
             return std::nullopt;
         }

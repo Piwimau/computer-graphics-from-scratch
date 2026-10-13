@@ -176,56 +176,6 @@ struct Color {
     }
 
     /**
-     * @brief Divides this color by a scalar (component-wise).
-     *
-     * @param[in] rhs The scalar to divide by.
-     * @return A reference to this color.
-     */
-    constexpr Color& operator/=(f32 rhs) noexcept {
-        r = r / rhs;
-        g = g / rhs;
-        b = b / rhs;
-        return *this;
-    }
-
-    /**
-     * @brief Divides a color by a scalar (component-wise).
-     *
-     * @param[in] lhs The color to scale.
-     * @param[in] rhs The scalar to divide by.
-     * @return The result of dividing the color by the scalar.
-     */
-    friend constexpr Color operator/(Color lhs, f32 rhs) noexcept {
-        lhs /= rhs;
-        return lhs;
-    }
-
-    /**
-     * @brief Divides this color by another color (component-wise).
-     *
-     * @param[in] rhs The color to divide by.
-     * @return A reference to this color.
-     */
-    constexpr Color& operator/=(const Color& rhs) noexcept {
-        r = r / rhs.r;
-        g = g / rhs.g;
-        b = b / rhs.b;
-        return *this;
-    }
-
-    /**
-     * @brief Divides two colors (component-wise).
-     *
-     * @param[in] lhs The color to divide.
-     * @param[in] rhs The color to divide by.
-     * @return The result of dividing the first color by the second.
-     */
-    friend constexpr Color operator/(Color lhs, const Color& rhs) noexcept {
-        lhs /= rhs;
-        return lhs;
-    }
-
-    /**
      * @brief Returns the minimum component of this color.
      *
      * @return The minimum component of this color.
@@ -310,7 +260,7 @@ struct Color {
      */
     constexpr Color tone_map_reinhard() const noexcept {
         f32 luminance = 0.2126F * r + 0.7152F * g + 0.0722F * b;
-        return (*this / (1.0F + luminance)).clamp(0.0F, 1.0F);
+        return (*this * (1.0F / (1.0F + luminance))).clamp(0.0F, 1.0F);
     }
 
     /**

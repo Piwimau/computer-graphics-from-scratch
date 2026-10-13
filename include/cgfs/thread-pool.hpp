@@ -2,6 +2,7 @@
 #define CGFS_THREAD_POOL_HPP
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <concepts>
 #include <condition_variable>
@@ -28,13 +29,16 @@ private:
     std::queue<std::move_only_function<void()>> _tasks;
 
     /** @brief A condition variable to signal that tasks are available. */
-    std::condition_variable_any _tasksAvailable;
-
-    /** @brief The number of tasks queued or currently being executed. */
-    isize _pending = 0;
+    std::condition_variable _tasksAvailable;
 
     /** @brief A condition variable to signal that all threads are idle. */
     std::condition_variable _idle;
+
+    /** @brief Indicates whether this thread pool is shutting down. */
+    bool _shutdown = false;
+
+    /** @brief The number of tasks queued or currently being executed. */
+    std::atomic<isize> _pending = 0;
 
     /**
      * @brief The worker threads.
@@ -43,6 +47,15 @@ private:
      * order.
      */
     std::vector<std::jthread> _threads;
+
+    /** @brief Shuts down this thread pool. */
+    void shutdown() noexcept {
+        {
+            std::scoped_lock lock(_mutex);
+            _shutdown = true;
+        }
+        _tasksAvailable.notify_all();
+    }
 
 public:
 
@@ -59,36 +72,37 @@ public:
             std::max<isize>(1, std::thread::hardware_concurrency())
     ) {
         assert(numThreads > 0);
-        auto worker = [this](std::stop_token token) {
+        auto worker = [this]() {
             while (true) {
+                std::move_only_function<void()> task;
                 {
-                    std::move_only_function<void()> task;
-                    {
-                        std::unique_lock<std::mutex> lock(_mutex);
-                        _tasksAvailable.wait(
-                            lock,
-                            token,
-                            [this]() { return !_tasks.empty(); }
-                        );
-                        if (token.stop_requested()) {
-                            return;
-                        }
-                        task = std::move(_tasks.front());
-                        _tasks.pop();
+                    std::unique_lock<std::mutex> lock(_mutex);
+                    _tasksAvailable.wait(
+                        lock,
+                        [this]() { return !_tasks.empty() || _shutdown; }
+                    );
+                    if (_shutdown) {
+                        return;
                     }
-                    task();
+                    task = std::move(_tasks.front());
+                    _tasks.pop();
                 }
-                {
-                    std::scoped_lock<std::mutex> lock(_mutex);
-                    _pending--;
-                    if (_pending == 0) {
-                        _idle.notify_all();
-                    }
+                task();
+                if (_pending.fetch_sub(1, std::memory_order::acq_rel) == 1) {
+                    std::scoped_lock lock(_mutex);
+                    _idle.notify_all();
                 }
             }
         };
-        for (isize i = 0; i < numThreads; i++) {
-            _threads.emplace_back(worker);
+        _threads.reserve(numThreads);
+        try {
+            for (isize i = 0; i < numThreads; i++) {
+                _threads.emplace_back(worker);
+            }
+        }
+        catch (...) {
+            shutdown();
+            throw;
         }
     }
 
@@ -121,7 +135,7 @@ public:
         {
             std::scoped_lock<std::mutex> lock(_mutex);
             _tasks.emplace(std::move(task));
-            _pending++;
+            _pending.fetch_add(1, std::memory_order::relaxed);
         }
         _tasksAvailable.notify_one();
         return result;
@@ -142,7 +156,7 @@ public:
         {
             std::scoped_lock<std::mutex> lock(_mutex);
             _tasks.emplace(std::forward<F>(f));
-            _pending++;
+            _pending.fetch_add(1, std::memory_order::relaxed);
         }
         _tasksAvailable.notify_one();
     }
@@ -157,6 +171,11 @@ public:
     void wait_idle() {
         std::unique_lock<std::mutex> lock(_mutex);
         _idle.wait(lock, [this]() { return _pending == 0; });
+    }
+
+    /** @brief Destructs this thread pool. */
+    ~ThreadPool() {
+        shutdown();
     }
 
 };

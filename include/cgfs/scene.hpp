@@ -4,12 +4,16 @@
 #include <vector>
 #include "cgfs/camera.hpp"
 #include "cgfs/light.hpp"
+#include "cgfs/material.hpp"
 #include "cgfs/sphere.hpp"
 
 namespace cgfs {
 
 /** @brief A scene to be rendered. */
 struct Scene {
+
+    /** @brief The materials used in this scene. */
+    std::vector<Material> materials;
 
     /** @brief The spheres positioned in this scene. */
     std::vector<Sphere> spheres;

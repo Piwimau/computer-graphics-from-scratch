@@ -46,11 +46,11 @@ private:
      * @return The Fresnel reflectance and the cosine of the transmitted angle.
      */
     static constexpr std::pair<f32, f32> fresnel(f32 eta, f32 cosI) noexcept {
-        f32 sin2T = eta * eta * (1.0F - cosI * cosI);
-        if (sin2T >= 1.0F) {
+        f32 sinSquaredT = eta * eta * (1.0F - cosI * cosI);
+        if (sinSquaredT >= 1.0F) {
             return { 1.0F, 0.0F };
         }
-        f32 cosT = std::sqrt(1.0F - sin2T);
+        f32 cosT = std::sqrt(1.0F - sinSquaredT);
         f32 rs = (eta * cosI - cosT) / std::max(eta * cosI + cosT, 1.0E-12F);
         f32 rp = (cosI - eta * cosT) / std::max(cosI + eta * cosT, 1.0E-12F);
         return { 0.5F * (rs * rs + rp * rp), cosT };
@@ -95,7 +95,7 @@ public:
      * @param[in, out] prng A pseudorandom number generator.
      * @return The sampled bounce.
      */
-    constexpr Bounce sample(Prng& prng) const noexcept {
+    constexpr Bounce sample(Xoshiro128StarStar& prng) const noexcept {
         if (prng.next_f32() < _fresnel) {
             return {
                 .direction = _view.reflect(_normal),

@@ -1,7 +1,6 @@
 #ifndef CGFS_SPHERE_HPP
 #define CGFS_SPHERE_HPP
 
-#include "cgfs/material.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
 
@@ -16,8 +15,8 @@ struct Sphere {
     /** @brief The radius. */
     f32 radius;
 
-    /** @brief The surface material. */
-    Material material;
+    /** @brief The index of the surface material. */
+    isize materialIdx;
 
 };
 

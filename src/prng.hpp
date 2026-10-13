@@ -7,8 +7,39 @@
 
 namespace cgfs {
 
-/** @brief A pseudorandom number generator. */
-class Prng final {
+/** @brief A SplitMix64 pseudorandom number generator. */
+class SplitMix64 final {
+private:
+
+    /** @brief The internal state. */
+    u64 _state;
+
+public:
+
+    /**
+     * @brief Constructs a SplitMix64 pseudorandom number generator with a
+     * specified seed.
+     *
+     * @param[in] seed The seed for the initialization.
+     */
+    constexpr explicit SplitMix64(u64 seed) noexcept : _state(seed) { }
+
+    /**
+     * @brief Returns a pseudorandom `u64`.
+     *
+     * @return A pseudorandom `u64`.
+     */
+    constexpr u64 next() noexcept {
+        u64 z = (_state += 0x9E3779B97F4A7C15ULL);
+        z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+        z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+        return z ^ (z >> 31);
+    }
+
+};
+
+/** @brief A Xoshiro128** pseudorandom number generator. */
+class Xoshiro128StarStar final {
 private:
 
     /** @brief The internal state. */
@@ -21,15 +52,9 @@ private:
      * @return An initial state for the pseudorandom number generator.
      */
     static constexpr std::array<u32, 4> make_state(u64 seed) noexcept {
-        auto splitmix64 = [](u64& state) {
-            state += 0x9E3779B97F4A7C15ULL;
-            u64 z = state;
-            z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
-            z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
-            return z ^ (z >> 31);
-        };
-        u64 a = splitmix64(seed);
-        u64 b = splitmix64(seed);
+        SplitMix64 prng(seed);
+        u64 a = prng.next();
+        u64 b = prng.next();
         return {
             static_cast<u32>(a),
             static_cast<u32>(a >> 32),
@@ -41,11 +66,13 @@ private:
 public:
 
     /**
-     * @brief Constructs a pseudorandom number generator with a specified seed.
+     * @brief Constructs a Xoshiro128** pseudorandom number generator with a
+     * specified seed.
      *
      * @param[in] seed The seed for the initialization.
      */
-    constexpr explicit Prng(u64 seed) noexcept : _state(make_state(seed)) { }
+    constexpr explicit Xoshiro128StarStar(u64 seed) noexcept
+        : _state(make_state(seed)) { }
 
     /**
      * @brief Generates a pseudorandom `u32`.

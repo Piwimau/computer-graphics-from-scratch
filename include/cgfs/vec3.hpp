@@ -199,59 +199,6 @@ struct Vec3 {
     }
 
     /**
-     * @brief Divides this vector by a scalar (component-wise).
-     *
-     * @param[in] rhs The scalar to divide by.
-     * @return A reference to this vector.
-     */
-    constexpr Vec3<T>& operator/=(T rhs) noexcept {
-        x /= rhs;
-        y /= rhs;
-        z /= rhs;
-        return *this;
-    }
-
-    /**
-     * @brief Divides a vector by a scalar (component-wise).
-     *
-     * @param[in] lhs The vector to scale.
-     * @param[in] rhs The scalar to divide by.
-     * @return The result of dividing the vector by the scalar.
-     */
-    friend constexpr Vec3<T> operator/(Vec3<T> lhs, T rhs) noexcept {
-        lhs /= rhs;
-        return lhs;
-    }
-
-    /**
-     * @brief Divides this vector by another vector (component-wise).
-     *
-     * @param[in] rhs The vector to divide by.
-     * @return A reference to this vector.
-     */
-    constexpr Vec3<T>& operator/=(const Vec3<T>& rhs) noexcept {
-        x /= rhs.x;
-        y /= rhs.y;
-        z /= rhs.z;
-        return *this;
-    }
-
-    /**
-     * @brief Divides two vectors (component-wise).
-     *
-     * @param[in] lhs The vector to divide.
-     * @param[in] rhs The vector to divide by.
-     * @return The result of dividing the two vectors.
-     */
-    friend constexpr Vec3<T> operator/(
-        Vec3<T> lhs,
-        const Vec3<T>& rhs
-    ) noexcept {
-        lhs /= rhs;
-        return lhs;
-    }
-
-    /**
      * @brief Returns the dot product of this vector and another vector.
      *
      * @param[in] rhs The other vector.
