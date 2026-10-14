@@ -11,6 +11,7 @@
 #include "cgfs/pathtracer.hpp"
 #include "cgfs/quat.hpp"
 #include "cgfs/scene.hpp"
+#include "cgfs/sky.hpp"
 #include "cgfs/sphere.hpp"
 #include "cgfs/thread-pool.hpp"
 #include "cgfs/types.hpp"

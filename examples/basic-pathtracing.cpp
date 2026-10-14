@@ -72,10 +72,8 @@ static constexpr Scene make_scene() {
                 .materialIdx = 3
             }
         },
-        .lights = {
-            Light::point().position({ 2.0F, 1.0F, 0.0F }).build(),
-            Light::directional().direction({ -4.0F, -1.0F, -1.0F }).build()
-        },
+        .lights = { },
+        .sky = Sky::day(),
         .camera = Camera::builder().build()
     };
 }

@@ -513,6 +513,33 @@ public:
         return std::get_if<Directional>(&_kind);
     }
 
+    /**
+     * @brief Determines whether this light is a point light.
+     *
+     * @return `true` if this light is a point light, `false` otherwise.
+     */
+    constexpr bool is_point() const noexcept {
+        return std::holds_alternative<Point>(_kind);
+    }
+
+    /**
+     * @brief Determines whether this light is a spot light.
+     *
+     * @return `true` if this light is a spot light, `false` otherwise.
+     */
+    constexpr bool is_spot() const noexcept {
+        return std::holds_alternative<Spot>(_kind);
+    }
+
+    /**
+     * @brief Determines whether this light is a directional light.
+     *
+     * @return `true` if this light is a directional light, `false` otherwise.
+     */
+    constexpr bool is_directional() const noexcept {
+        return std::holds_alternative<Directional>(_kind);
+    }
+
 };
 
 }

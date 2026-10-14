@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <cmath>
 #include <optional>
 #include <random>
@@ -42,6 +43,9 @@ struct SceneInfo {
     /** @brief The lights in the scene. */
     std::vector<Light> lights;
 
+    /** @brief The sky of the scene (if any). */
+    std::optional<Sky> sky;
+
     /**
      * @brief Collects information about a scene suitable for path tracing.
      *
@@ -72,6 +76,11 @@ struct SceneInfo {
             }
         }
         sceneInfo.lights = scene.lights;
+        sceneInfo.sky = scene.sky;
+        if (sceneInfo.sky) {
+            assert(sceneInfo.sky->sunLight.is_directional());
+            sceneInfo.lights.push_back(sceneInfo.sky->sunLight);
+        }
         return sceneInfo;
     }
 
@@ -270,6 +279,40 @@ static constexpr std::optional<Hit> intersect_spheres(
         closestIdx + offset,
         ray.maxDistance
     );
+}
+
+/**
+ * @brief Returns the radiance of a sky in a direction.
+ *
+ * @param[in] sky        The sky to sample.
+ * @param[in] direction  The direction in which to sample.
+ * @param[in] includeSun Whether to include the sun light's contribution.
+ * @return The radiance of the sky in the direction.
+ */
+static constexpr Color sky_radiance(
+    const Sky& sky,
+    const Vec3<f32>& direction,
+    bool includeSun
+) noexcept {
+    const Light::Directional& sun = *sky.sunLight.as_directional();
+    f32 glow = std::max(direction.dot(-sun.direction), 0.0F);
+    glow *= glow;
+    glow *= glow;
+    Color horizon = Color::lerp(sky.horizon, sky.sunLight.color(), glow);
+    f32 t = std::clamp(direction.y, 0.0F, 1.0F);
+    f32 inv = 1.0F - t;
+    t = 1.0F - inv * inv * inv;
+    Color radiance = Color::lerp(horizon, sky.zenith, t);
+    if (
+        includeSun
+            && (sun.cosAngularRadius < 1.0F)
+            && (direction.dot(-sun.direction) >= sun.cosAngularRadius)
+    ) {
+        f32 solidAngle = 2.0F * PI<f32> * (1.0F - sun.cosAngularRadius);
+        radiance += sky.sunLight.color()
+            * (sky.sunLight.intensity() / solidAngle);
+    }
+    return radiance;
 }
 
 /**
@@ -665,6 +708,17 @@ static constexpr Color trace(
     for (isize depth = 0; depth < MAX_DEPTH; depth++) {
         std::optional<Hit> hit = intersect_spheres(sceneInfo.spheres, ray);
         if (!hit) {
+            if (sceneInfo.sky) {
+                radiance += restrict_radiance(
+                    throughput
+                        * sky_radiance(
+                            *sceneInfo.sky,
+                            ray.direction,
+                            !previousPdf
+                        ),
+                    depth
+                );
+            }
             break;
         }
         const auto& [distance, position, normal, idx, entering] = *hit;

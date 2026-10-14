@@ -58,17 +58,8 @@ static constexpr Scene make_scene() {
                 .materialIdx = 0
             }
         },
-        .lights = {
-            Light::point()
-                .intensity(3.0F)
-                .position({ 3.0F, 5.0F, -3.0F })
-                .build(),
-            Light::directional()
-                .color({ 0.6F, 0.7F, 1.0F })
-                .intensity(1.0F)
-                .direction({ -0.3F, -1.0F, -0.3F })
-                .build()
-        },
+        .lights = { },
+        .sky = Sky::day(),
         .camera = Camera::builder().build()
     };
     for (isize y = 0; y < GRID_SIZE; y++) {
