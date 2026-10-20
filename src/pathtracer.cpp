@@ -791,7 +791,11 @@ static constexpr Color trace(
     return radiance;
 }
 
-void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film) {
+CGFS_API void pathtrace(
+    const Scene& scene,
+    ThreadPool& threadPool,
+    Film& film
+) {
     SceneInfo sceneInfo = SceneInfo::from(scene);
     f32 width = static_cast<f32>(film.width());
     f32 height = static_cast<f32>(film.height());

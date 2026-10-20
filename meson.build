@@ -52,8 +52,41 @@ deps += cpp.find_library('m', required: false)
 incs = include_directories('include')
 srcs = files('src/pathtracer.cpp')
 
-cgfs_lib = library('cgfs', srcs, include_directories: incs, dependencies: deps)
-cgfs_dep = declare_dependency(include_directories: incs, link_with: cgfs_lib)
+if get_option('default_library') == 'static'
+    lib_cpp_args = ['-DCGFS_STATIC']
+    dep_cpp_args = ['-DCGFS_STATIC']
+else
+    lib_cpp_args = ['-DCGFS_BUILD_SHARED']
+    dep_cpp_args = ['-DCGFS_SHARED']
+endif
+
+cgfs_lib = library(
+    'cgfs',
+    srcs,
+    include_directories: incs,
+    dependencies: deps,
+    gnu_symbol_visibility: 'hidden',
+    cpp_args: lib_cpp_args,
+    install: true,
+)
+
+install_subdir('include/cgfs', install_dir: 'include')
+
+cgfs_dep = declare_dependency(
+    include_directories: incs,
+    link_with: cgfs_lib,
+    compile_args: dep_cpp_args,
+)
+
+meson.override_dependency('cgfs', cgfs_dep)
+
+pkg = import('pkgconfig')
+pkg.generate(
+    cgfs_lib,
+    description: 'A small computer graphics library.',
+    url: 'https://github.com/Piwimau/computer-graphics-from-scratch',
+    extra_cflags: dep_cpp_args,
+)
 
 if get_option('examples')
     subdir('examples')

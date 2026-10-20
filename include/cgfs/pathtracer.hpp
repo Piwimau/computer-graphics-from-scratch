@@ -1,6 +1,7 @@
 #ifndef CGFS_PATHTRACER_HPP
 #define CGFS_PATHTRACER_HPP
 
+#include "cgfs/api.hpp"
 #include "cgfs/film.hpp"
 #include "cgfs/scene.hpp"
 #include "cgfs/thread-pool.hpp"
@@ -14,7 +15,7 @@ namespace cgfs {
  * @param[in, out] threadPool A thread pool for accelerating the computation.
  * @param[out]     film       The film to render the scene to.
  */
-void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film);
+CGFS_API void pathtrace(const Scene& scene, ThreadPool& threadPool, Film& film);
 
 }
 

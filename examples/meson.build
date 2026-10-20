@@ -14,7 +14,7 @@ endif
 
 deps += cpp.find_library('m', required: false)
 deps += dependency('sdl3')
-deps += cgfs_dep
+deps += dependency('cgfs')
 
 foreach name, src : examples
     executable(name, src, dependencies: deps)

@@ -1,6 +1,7 @@
 #ifndef CGFS_HPP
 #define CGFS_HPP
 
+#include "cgfs/api.hpp"
 #include "cgfs/camera.hpp"
 #include "cgfs/color.hpp"
 #include "cgfs/film.hpp"
