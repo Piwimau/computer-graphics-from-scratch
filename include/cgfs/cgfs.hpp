@@ -19,4 +19,16 @@
 #include "cgfs/vec2.hpp"
 #include "cgfs/vec3.hpp"
 
+/** @brief The major version number of CGFS. */
+#define CGFS_VERSION_MAJOR 0
+
+/** @brief The minor version number of CGFS. */
+#define CGFS_VERSION_MINOR 1
+
+/** @brief The patch version number of CGFS. */
+#define CGFS_VERSION_PATCH 0
+
+/** @brief The version string of CGFS. */
+#define CGFS_VERSION_STRING "0.1.0"
+
 #endif
