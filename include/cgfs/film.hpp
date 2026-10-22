@@ -148,8 +148,8 @@ public:
      * @warning The behavior is undefined if `x` or `y` is out of bounds.
      */
     constexpr void add_sample(isize x, isize y, const Color& sample) noexcept {
-        assert((x >= 0) && (x < _width));
-        assert((y >= 0) && (y < _height));
+        assert(x >= 0 && x < _width);
+        assert(y >= 0 && y < _height);
         _buffer[y * _width + x] += sample;
     }
 

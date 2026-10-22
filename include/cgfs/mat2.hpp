@@ -77,7 +77,7 @@ public:
      * @return The specified row of this matrix.
      */
     constexpr std::span<const T, COLS> operator[](isize row) const noexcept {
-        assert((row >= 0) && (row < ROWS));
+        assert(row >= 0 && row < ROWS);
         return std::span<const T, COLS>(_elems.data() + row * COLS, COLS);
     }
 
@@ -88,7 +88,7 @@ public:
      * @return The specified row of this matrix.
      */
     constexpr std::span<T, COLS> operator[](isize row) noexcept {
-        assert((row >= 0) && (row < ROWS));
+        assert(row >= 0 && row < ROWS);
         return std::span<T, COLS>(_elems.data() + row * COLS, COLS);
     }
 

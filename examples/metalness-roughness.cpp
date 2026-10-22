@@ -146,7 +146,7 @@ static bool handle_events_and_inputs(
         .y = 0.0F,
         .z = axis(SDL_SCANCODE_S, SDL_SCANCODE_W)
     };
-    if ((horizontal.x != 0.0F) || (horizontal.z != 0.0F)) {
+    if (horizontal.x != 0.0F || horizontal.z != 0.0F) {
         Vec3<f32> delta = horizontal.normalize() * speed * deltaTime;
         camera.adjust_position(delta, Space::VIEW);
         clearFilm = true;

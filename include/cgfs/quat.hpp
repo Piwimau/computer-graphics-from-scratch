@@ -71,7 +71,7 @@ struct Quat {
                 .w = static_cast<T>(0.25) * s
             };
         }
-        if ((m[0][0] >= m[1][1]) && (m[0][0] >= m[2][2])) {
+        if (m[0][0] >= m[1][1] && m[0][0] >= m[2][2]) {
             T s = std::sqrt(static_cast<T>(1) + m[0][0] - m[1][1] - m[2][2])
                 * static_cast<T>(2);
             return {

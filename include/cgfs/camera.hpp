@@ -137,7 +137,7 @@ public:
          * `Camera::DEFAULT_MAX_FOV`.
          */
         constexpr Builder& fov_limits(f32 minFov, f32 maxFov) noexcept {
-            assert((minFov > 0.0F) && (maxFov < cgfs::radians(180.0F)));
+            assert(minFov > 0.0F && maxFov < cgfs::radians(180.0F));
             assert(minFov <= maxFov);
             _minFov = minFov;
             _maxFov = maxFov;
@@ -162,8 +162,8 @@ public:
          */
         constexpr Builder& pitch_limits(f32 minPitch, f32 maxPitch) noexcept {
             assert(
-                (minPitch > cgfs::radians(-90.0F))
-                    && (maxPitch < cgfs::radians(90.0F))
+                minPitch > cgfs::radians(-90.0F)
+                    && maxPitch < cgfs::radians(90.0F)
             );
             assert(minPitch <= maxPitch);
             _minPitch = minPitch;

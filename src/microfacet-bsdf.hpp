@@ -285,7 +285,7 @@ public:
     constexpr std::optional<Bounce> sample(
         Xoshiro128StarStar& prng
     ) const noexcept {
-        if ((_diffuseProbability <= 0.0F) && (_specularProbability <= 0.0F)) {
+        if (_diffuseProbability <= 0.0F && _specularProbability <= 0.0F) {
             return std::nullopt;
         }
         return (prng.next_f32() < _specularProbability)

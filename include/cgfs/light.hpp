@@ -139,7 +139,7 @@ public:
          * outside the range `[0.0F, 1.0F]`.
          */
         constexpr Derived& color(const Color& color) noexcept {
-            assert((color.min() >= 0.0F) && (color.max() <= 1.0F));
+            assert(color.min() >= 0.0F && color.max() <= 1.0F);
             _color = color;
             return static_cast<Derived&>(*this);
         }
@@ -288,12 +288,8 @@ public:
             f32 innerCutoff,
             f32 outerCutoff
         ) noexcept {
-            assert(
-                (innerCutoff > 0.0F) && (innerCutoff < cgfs::radians(180.0F))
-            );
-            assert(
-                (outerCutoff > 0.0F) && (outerCutoff < cgfs::radians(180.0F))
-            );
+            assert(innerCutoff > 0.0F && innerCutoff < cgfs::radians(180.0F));
+            assert(outerCutoff > 0.0F && outerCutoff < cgfs::radians(180.0F));
             assert(innerCutoff <= outerCutoff);
             _spot.cosInnerCutoff = std::cos(innerCutoff);
             _spot.cosOuterCutoff = std::cos(outerCutoff);
@@ -386,8 +382,7 @@ public:
             f32 angularRadius
         ) noexcept {
             assert(
-                (angularRadius >= 0.0F)
-                    && (angularRadius < cgfs::radians(90.0F))
+                angularRadius >= 0.0F && angularRadius < cgfs::radians(90.0F)
             );
             _directional.cosAngularRadius = std::cos(angularRadius);
             return *this;

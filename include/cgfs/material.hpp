@@ -88,7 +88,7 @@ public:
          * outside the range `[0.0F, 1.0F]`.
          */
         constexpr Derived& albedo(const Color& albedo) noexcept {
-            assert((albedo.min() >= 0.0F) && (albedo.max() <= 1.0F));
+            assert(albedo.min() >= 0.0F && albedo.max() <= 1.0F);
             _albedo = albedo;
             return static_cast<Derived&>(*this);
         }
@@ -103,7 +103,7 @@ public:
          * range `[0.0F, 1.0F]`.
          */
         constexpr Derived& roughness(f32 roughness) noexcept {
-            assert((roughness >= 0.0F) && (roughness <= 1.0F));
+            assert(roughness >= 0.0F && roughness <= 1.0F);
             _roughness = roughness;
             return static_cast<Derived&>(*this);
         }
@@ -144,7 +144,7 @@ public:
          * range `[0.0F, 1.0F]`.
          */
         constexpr OpaqueBuilder& metalness(f32 metalness) noexcept {
-            assert((metalness >= 0.0F) && (metalness <= 1.0F));
+            assert(metalness >= 0.0F && metalness <= 1.0F);
             _opaque.metalness = metalness;
             return *this;
         }
@@ -188,7 +188,7 @@ public:
          * range `[0.0F, 1.0F]`.
          */
         constexpr TransparentBuilder& transparency(f32 transparency) noexcept {
-            assert((transparency >= 0.0F) && (transparency <= 1.0F));
+            assert(transparency >= 0.0F && transparency <= 1.0F);
             _transparent.transparency = transparency;
             return *this;
         }
