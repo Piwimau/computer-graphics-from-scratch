@@ -6,8 +6,8 @@
 #include "cgfs/camera.hpp"
 #include "cgfs/light.hpp"
 #include "cgfs/material.hpp"
+#include "cgfs/object.hpp"
 #include "cgfs/sky.hpp"
-#include "cgfs/sphere.hpp"
 
 namespace cgfs {
 
@@ -17,8 +17,13 @@ struct Scene {
     /** @brief The materials used in this scene. */
     std::vector<Material> materials;
 
-    /** @brief The spheres positioned in this scene. */
-    std::vector<Sphere> spheres;
+    /**
+     * @brief The objects positioned in this scene.
+     *
+     * @note This vector must be ordered such that opaque objects appear before
+     * transparent objects.
+     */
+    std::vector<Object> objects;
 
     /** @brief The lights illuminating this scene. */
     std::vector<Light> lights;

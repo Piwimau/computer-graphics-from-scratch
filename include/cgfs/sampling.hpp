@@ -3,14 +3,28 @@
 
 #include <algorithm>
 #include <cmath>
-#include "basis.hpp"
+#include "cgfs/basis.hpp"
+#include "cgfs/prng.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/util.hpp"
 #include "cgfs/vec2.hpp"
 #include "cgfs/vec3.hpp"
-#include "prng.hpp"
 
 namespace cgfs {
+
+/** @brief A sampled point on an object as seen from a position. */
+struct PointSample {
+
+    /** @brief The direction to the sampled point. */
+    Vec3<f32> direction;
+
+    /** @brief The distance to the sampled point. */
+    f32 distance;
+
+    /** @brief The solid-angle PDF (if available). */
+    std::optional<f32> pdf;
+
+};
 
 /**
  * @brief Samples a point uniformly on the unit disk.
@@ -67,26 +81,6 @@ constexpr f32 cone_pdf(f32 versine) noexcept {
 }
 
 /**
- * @brief Returns the solid-angle PDF of sampling a cone subtended by a sphere
- * uniformly.
- *
- * @param[in] center   The center of the sphere.
- * @param[in] radius   The radius of the sphere.
- * @param[in] position The position from which the cone is subtended.
- * @return The solid-angle PDF of sampling the cone subtended by the sphere
- * uniformly.
- */
-constexpr f32 sphere_cone_pdf(
-    const Vec3<f32>& center,
-    f32 radius,
-    const Vec3<f32>& position
-) noexcept {
-    f32 distanceSquared = (center - position).norm_squared();
-    f32 versine = sphere_versine(distanceSquared, radius);
-    return cone_pdf(versine);
-}
-
-/**
  * @brief Samples a direction uniformly inside a cone.
  *
  * @param[in]      axis    The axis of the cone (normalized).
@@ -108,6 +102,44 @@ constexpr Vec3<f32> sample_cone(
         .z = 1.0F - versine * s
     };
     return Basis::around(axis).to_world(local);
+}
+
+/**
+ * @brief Samples a direction towards a sphere, uniformly by solid angle.
+ *
+ * @param[in]      center   The center of the sphere.
+ * @param[in]      radius   The radius of the sphere.
+ * @param[in]      position The position from which to sample.
+ * @param[in, out] prng     A pseudorandom number generator.
+ * @return A sample on success, or `std::nullopt` if the position is inside the
+ * sphere.
+ */
+static constexpr std::optional<PointSample> sample_sphere(
+    const Vec3<f32>& center,
+    f32 radius,
+    const Vec3<f32>& position,
+    Xoshiro128StarStar& prng
+) noexcept {
+    Vec3<f32> axis = center - position;
+    f32 distanceSquared = axis.norm_squared();
+    f32 radiusSquared = radius * radius;
+    if (distanceSquared <= radiusSquared) {
+        return std::nullopt;
+    }
+    f32 versine = sphere_versine(distanceSquared, radius);
+    Vec3<f32> direction = sample_cone(
+        axis * (1.0F / std::sqrt(distanceSquared)),
+        versine,
+        prng
+    );
+    f32 b = direction.dot(axis);
+    f32 d = b * b - (distanceSquared - radiusSquared);
+    f32 distance = b - std::sqrt(std::max(d, 0.0F));
+    return PointSample {
+        .direction = direction,
+        .distance = distance,
+        .pdf = cone_pdf(versine)
+    };
 }
 
 }

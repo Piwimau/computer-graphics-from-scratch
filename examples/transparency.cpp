@@ -33,6 +33,20 @@ static constexpr f32 SPRINT_SPEED = 15.0F;
 static constexpr Scene make_scene() {
     return {
         .materials = {
+            Material::opaque()
+                .albedo({ 1.0F, 0.1F, 0.1F })
+                .roughness(0.4F)
+                .build(),
+            Material::opaque()
+                .albedo({ 0.1F, 0.2F, 1.0F })
+                .metalness(0.25F)
+                .roughness(0.3F)
+                .build(),
+            Material::opaque()
+                .albedo({ 1.0F, 1.0F, 1.0F })
+                .metalness(0.0F)
+                .roughness(0.75F)
+                .build(),
             Material::transparent().ior(1.5F).build(),
             Material::transparent()
                 .ior(1.5F)
@@ -48,66 +62,52 @@ static constexpr Scene make_scene() {
             Material::transparent()
                 .ior(1.45F)
                 .absorption({ 0.5F, 2.0F, 4.0F })
-                .build(),
-            Material::opaque()
-                .albedo({ 1.0F, 0.1F, 0.1F })
-                .roughness(0.4F)
-                .build(),
-            Material::opaque()
-                .albedo({ 0.1F, 0.2F, 1.0F })
-                .metalness(0.25F)
-                .roughness(0.3F)
-                .build(),
-            Material::opaque()
-                .albedo({ 1.0F, 1.0F, 1.0F })
-                .metalness(0.0F)
-                .roughness(0.75F)
                 .build()
         },
-        .spheres = {
-            {
-                .center = { 0.0F, 0.0F, -5.0F },
-                .radius = 1.0F,
+        .objects = {
+            Sphere {
+                .center = { -0.8F, 0.5F, -10.0F },
+                .radius = 1.5F,
                 .materialIdx = 0
             },
-            {
-                .center = { -2.4F, 0.0F, -5.0F },
+            Sphere {
+                .center = { 3.6F, 0.0F, -9.0F },
                 .radius = 1.0F,
                 .materialIdx = 1
             },
-            {
-                .center = { 2.4F, 0.0F, -5.0F },
-                .radius = 1.0F,
-                .materialIdx = 0
-            },
-            {
-                .center = { 2.4F, 0.0F, -5.0F },
-                .radius = 0.75F,
-                .materialIdx = 2
-            },
-            {
-                .center = { -0.9F, -0.6F, -2.6F },
-                .radius = 0.4F,
-                .materialIdx = 3
-            },
-            {
-                .center = { 1.0F, -0.6F, -2.6F },
-                .radius = 0.4F,
-                .materialIdx = 4
-            },
-            {
-                .center = { -0.8F, 0.5F, -10.0F },
-                .radius = 1.5F,
-                .materialIdx = 5
-            },
-            {
-                .center = { 3.6F, 0.0F, -9.0F },
-                .radius = 1.0F,
-                .materialIdx = 6
-            },
-            {
+            Sphere {
                 .center = { 0.0F, -501.0F, 0.0F },
                 .radius = 500.0F,
+                .materialIdx = 2
+            },
+            Sphere {
+                .center = { 0.0F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .materialIdx = 3
+            },
+            Sphere {
+                .center = { -2.4F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .materialIdx = 4
+            },
+            Sphere {
+                .center = { 2.4F, 0.0F, -5.0F },
+                .radius = 1.0F,
+                .materialIdx = 3
+            },
+            Sphere {
+                .center = { 2.4F, 0.0F, -5.0F },
+                .radius = 0.75F,
+                .materialIdx = 5
+            },
+            Sphere {
+                .center = { -0.9F, -0.6F, -2.6F },
+                .radius = 0.4F,
+                .materialIdx = 6
+            },
+            Sphere {
+                .center = { 1.0F, -0.6F, -2.6F },
+                .radius = 0.4F,
                 .materialIdx = 7
             }
         },

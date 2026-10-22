@@ -6,9 +6,9 @@
 #include <tuple>
 #include <utility>
 #include "bounce.hpp"
+#include "cgfs/prng.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
-#include "prng.hpp"
 
 namespace cgfs {
 

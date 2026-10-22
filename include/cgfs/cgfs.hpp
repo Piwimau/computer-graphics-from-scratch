@@ -1,16 +1,23 @@
 #ifndef CGFS_HPP
 #define CGFS_HPP
 
+#include "cgfs/aabb.hpp"
 #include "cgfs/api.hpp"
+#include "cgfs/basis.hpp"
 #include "cgfs/camera.hpp"
 #include "cgfs/color.hpp"
 #include "cgfs/film.hpp"
+#include "cgfs/hit.hpp"
 #include "cgfs/light.hpp"
 #include "cgfs/mat2.hpp"
 #include "cgfs/mat3.hpp"
 #include "cgfs/material.hpp"
+#include "cgfs/object.hpp"
 #include "cgfs/pathtracer.hpp"
+#include "cgfs/prng.hpp"
 #include "cgfs/quat.hpp"
+#include "cgfs/ray.hpp"
+#include "cgfs/sampling.hpp"
 #include "cgfs/scene.hpp"
 #include "cgfs/sky.hpp"
 #include "cgfs/sphere.hpp"

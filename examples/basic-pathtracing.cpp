@@ -50,23 +50,23 @@ static constexpr Scene make_scene() {
                 .build(),
             Material::opaque().albedo({ 1.0F, 1.0F, 0.0F }).build()
         },
-        .spheres = {
-            {
+        .objects = {
+            Sphere {
                 .center = { -2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
                 .materialIdx = 0
             },
-            {
+            Sphere {
                 .center = { 0.0F, -1.0F, -3.0F },
                 .radius = 1.0F,
                 .materialIdx = 1
             },
-            {
+            Sphere {
                 .center = { 2.0F, 0.0F, -4.0F },
                 .radius = 1.0F,
                 .materialIdx = 2
             },
-            {
+            Sphere {
                 .center = { 0.0F, -251.0F, 0.0F },
                 .radius = 250.0F,
                 .materialIdx = 3

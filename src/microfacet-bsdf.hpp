@@ -4,14 +4,14 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
-#include "basis.hpp"
 #include "bounce.hpp"
+#include "cgfs/basis.hpp"
 #include "cgfs/color.hpp"
+#include "cgfs/prng.hpp"
+#include "cgfs/sampling.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/util.hpp"
 #include "cgfs/vec3.hpp"
-#include "prng.hpp"
-#include "sampling.hpp"
 
 namespace cgfs {
 

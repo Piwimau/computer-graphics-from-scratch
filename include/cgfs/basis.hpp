@@ -7,7 +7,7 @@
 
 namespace cgfs {
 
-/** @brief An orthonormal basis around a normal. */
+/** @brief An orthonormal basis. */
 struct Basis {
 
     /** @brief The tangent (normalized). */
@@ -22,7 +22,7 @@ struct Basis {
     /**
      * @brief Constructs an orthonormal basis around a normal.
      *
-     * @param[in] normal The normal around which to build the basis
+     * @param[in] normal The normal around which to construct the basis
      *                   (normalized).
      * @return The orthonormal basis around the normal.
      *

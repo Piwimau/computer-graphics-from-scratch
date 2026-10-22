@@ -10,7 +10,7 @@
 #include <span>
 #include "cgfs/color.hpp"
 #include "cgfs/material.hpp"
-#include "cgfs/sphere.hpp"
+#include "cgfs/object.hpp"
 #include "cgfs/types.hpp"
 #include "cgfs/vec3.hpp"
 
@@ -19,7 +19,7 @@ namespace cgfs {
 /** @brief A medium a ray can travel through. */
 struct Medium {
 
-    /** @brief The index of the sphere bounding the medium. */
+    /** @brief The index of the object bounding the medium. */
     isize ownerIdx;
 
     /** @brief The index of refraction. */
@@ -30,14 +30,14 @@ struct Medium {
 
 };
 
-/** @brief A stack for tracking nested media of transparent spheres. */
+/** @brief A stack for tracking nested media of transparent objects. */
 class MediumStack final {
 private:
 
-    /** @brief The maximum nested transparent spheres. */
+    /** @brief The maximum nested transparent objects. */
     static constexpr isize MAX_NESTING = 8;
 
-    /** @brief The medium outside of all spheres. */
+    /** @brief The medium outside of all objects. */
     static constexpr Medium VACUUM = {
         .ownerIdx = -1,
         .ior = 1.0F,
@@ -51,10 +51,10 @@ private:
     isize _size = 0;
 
     /**
-     * @brief Returns the medium surrounding a sphere.
+     * @brief Returns the medium surrounding an object.
      *
-     * @param[in] idx The index of the sphere whose surrounding medium to find.
-     * @return The medium surrounding the sphere.
+     * @param[in] idx The index of the object whose surrounding medium to find.
+     * @return The medium surrounding the object.
      */
     constexpr const Medium& surrounding(isize idx) const noexcept {
         auto end = _media.begin() + _size;
@@ -71,10 +71,10 @@ private:
     }
 
     /**
-     * @brief Pushes the medium of a transparent sphere onto this stack.
+     * @brief Pushes the medium of a transparent object onto this stack.
      *
-     * @param[in] idx         The index of the sphere whose medium to push.
-     * @param[in] transparent The transparent material of the sphere.
+     * @param[in] idx         The index of the object whose medium to push.
+     * @param[in] transparent The transparent material of the object.
      */
     constexpr void push(isize idx, const Material::Transparent& transparent) {
         assert(_size < MAX_NESTING);
@@ -84,25 +84,25 @@ private:
 public:
 
     /**
-     * @brief Constructs an initial medium stack for a set of spheres.
+     * @brief Constructs an initial medium stack for a set of objects.
      *
-     * @param[in] spheres   The set of spheres.
-     * @param[in] materials The materials of the spheres.
+     * @param[in] objects   The set of objects.
+     * @param[in] materials The materials of the objects.
      * @param[in] position  The position of the camera.
-     * @return The initial medium stack for the set of spheres.
+     * @return The initial medium stack for the set of objects.
      */
     static constexpr MediumStack initial(
-        std::span<const Sphere> spheres,
+        std::span<const Object> objects,
         std::span<const Material> materials,
         const Vec3<f32>& position
     ) {
         std::array<isize, MAX_NESTING> enclosing;
         isize size = 0;
-        for (auto [idx, sphere] : std::views::enumerate(spheres)) {
-            bool inside = (position - sphere.center).norm_squared()
-                < sphere.radius * sphere.radius;
-            const Material& material = materials[sphere.materialIdx];
-            if (inside && material.is_transparent()) {
+        for (auto [idx, object] : std::views::enumerate(objects)) {
+            if (
+                object.contains(position)
+                    && materials[object.material_idx()].is_transparent()
+            ) {
                 assert(size < MAX_NESTING);
                 enclosing[size++] = idx;
             }
@@ -111,12 +111,15 @@ public:
             enclosing.begin(),
             enclosing.begin() + size,
             std::greater<f32>(),
-            [&](isize idx) { return spheres[idx].radius; }
+            [&](isize idx) {
+                Aabb box = objects[idx].bounds();
+                return (box.max - box.min).norm_squared();
+            }
         );
         MediumStack media;
         for (isize idx : std::span(enclosing.data(), size)) {
-            const Sphere& sphere = spheres[idx];
-            const Material& material = materials[sphere.materialIdx];
+            const Object& object = objects[idx];
+            const Material& material = materials[object.material_idx()];
             media.push(idx, *material.as_transparent());
         }
         return media;
@@ -134,9 +137,9 @@ public:
     /**
      * @brief Returns the ratio of the indices of refraction at an interface.
      *
-     * @param[in] idx         The index of the transparent sphere that was hit.
-     * @param[in] transparent The transparent material of the sphere.
-     * @param[in] entering    Whether the sphere is entered or left.
+     * @param[in] idx         The index of the transparent object that was hit.
+     * @param[in] transparent The transparent material of the object.
+     * @param[in] entering    Whether the object is entered or left.
      * @return The ratio of the indices of refraction at the interface.
      */
     constexpr f32 eta(
@@ -174,11 +177,11 @@ public:
     }
 
     /**
-     * @brief Enters or leaves a transparent sphere.
+     * @brief Enters or leaves a transparent object.
      *
-     * @param[in] idx         The index of the sphere that was hit.
-     * @param[in] transparent The transparent material of the sphere.
-     * @param[in] entering    Whether the sphere is entered or left.
+     * @param[in] idx         The index of the object that was hit.
+     * @param[in] transparent The transparent material of the object.
+     * @param[in] entering    Whether the object is entered or left.
      */
     constexpr void transition(
         isize idx,

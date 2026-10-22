@@ -51,8 +51,8 @@ static constexpr Scene make_scene() {
                 .roughness(0.6F)
                 .build()
         },
-        .spheres = {
-            {
+        .objects = {
+            Sphere {
                 .center = { 0.0F, -FLOOR_RADIUS - SPHERE_RADIUS, 0.0F },
                 .radius = FLOOR_RADIUS,
                 .materialIdx = 0
@@ -75,16 +75,18 @@ static constexpr Scene make_scene() {
                     .roughness(roughness)
                     .build()
             );
-            scene.spheres.emplace_back(
-                Vec3<f32> {
-                    .x = (static_cast<f32>(x) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING,
-                    .y = 0.0F,
-                    .z = (-static_cast<f32>(y) - (GRID_SIZE - 1) / 2.0F)
-                        * GRID_SPACING
-                },
-                SPHERE_RADIUS,
-                std::ssize(scene.materials) - 1
+            scene.objects.push_back(
+                Sphere {
+                    .center = Vec3<f32> {
+                        .x = (static_cast<f32>(x) - (GRID_SIZE - 1) / 2.0F)
+                            * GRID_SPACING,
+                        .y = 0.0F,
+                        .z = (-static_cast<f32>(y) - (GRID_SIZE - 1) / 2.0F)
+                            * GRID_SPACING
+                    },
+                    .radius = SPHERE_RADIUS,
+                    .materialIdx = std::ssize(scene.materials) - 1
+                }
             );
         }
     }
