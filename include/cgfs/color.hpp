@@ -4,7 +4,6 @@
 #include <algorithm>
 #include <cmath>
 #include "cgfs/types.hpp"
-#include "cgfs/util.hpp"
 
 namespace cgfs {
 

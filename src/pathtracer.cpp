@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <bit>
-#include <cassert>
 #include <cmath>
 #include <optional>
 #include <random>

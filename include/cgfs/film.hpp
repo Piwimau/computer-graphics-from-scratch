@@ -8,7 +8,6 @@
 #include <vector>
 #include "cgfs/color.hpp"
 #include "cgfs/types.hpp"
-#include "cgfs/util.hpp"
 
 namespace cgfs {
 
